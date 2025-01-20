@@ -1,5 +1,48 @@
 # Monitoring Your Plants
 
+This is a fork of the original Grow project. The following changes have been made from the original:
+
+- Integrated `lgpio` library for improved GPIO handling.
+- Improved user interface with additional controls and status indicators.
+- Bug fixes and performance improvements.
+- Using lgpio library 
+
+## Kernel 5.4.51 SPI Chip-Select Issue
+
+As of the recent Kernel 5.4.51, it's no longer possible to add_event_detect on an SPI Chip-Select pin while the SPI interface is enabled.
+
+To replicate, use the following code snippet on a 5.4.51 Pi vs the previous kernel:
+
+```python
+import RPi.GPIO as GPIO
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(8, GPIO.IN)
+
+def test(pin):
+    pass
+
+GPIO.add_event_detect(8, edge=GPIO.RISING, callback=test)
+```
+
+It attempts to set up edge detection on SPI's default CE0 pin.
+
+Run this without SPI enabled and it will work fine.
+
+Run it with SPI enabled, and it will fail with "RuntimeError: Failed to add edge detection".
+
+This has changed from previous behavior and is likely due to changes in the 5.x Linux kernel (the new mutually exclusive gpiochip instead of sysfs) and is likely intended behavior despite breaking some potential back-compatibility cases, including the use of CS0 to read a moisture channel on the Grow board.
+
+The fix is simple enough. You must re-allocate the offending chip select channel to a different pin. There's a dtoverlay for this:
+
+```plaintext
+dtoverlay=spi0-cs,cs0_pin=14 # Re-assign CS0 from BCM 8 so that Grow can use it
+```
+
+This allocates CS0 to BCM14 (UART transmit) (currently unused by Grow) so that the above code will work in both cases.
+
+This line should be added to the Grow installer to be placed in `/boot/Firmware/config.txt` and we should consider moving that pin in a future revision (groan).
+
 The example `monitor.py` monitors the moisture level of your soil and sounds an alarm when it drops below a defined threshold.
 
 It's configured using `settings.yml`. Your settings for monitoring will look something like this:
