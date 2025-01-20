@@ -7,19 +7,19 @@ import threading
 import time
 
 import ltr559
-import RPi.GPIO as GPIO
+import lgpio as GPIO  # Change the import to lgpio
 import ST7735
 import yaml
 from fonts.ttf import RobotoMedium as UserFont
 from PIL import Image, ImageDraw, ImageFont
 
 from grow import Piezo
-from grow.moisture import Moisture
-from grow.pump import Pump
+from lgpio_moisture import Moisture  # Use our patched moisture module instead
+from lgpio_pump import Pump  # Use our patched pump module
 
 FPS = 10
 
-BUTTONS = [5, 6, 16, 24]
+BUTTONS = [5, 6, 16, 26]  # Updated Button Y to GPIO 26
 LABELS = ["A", "B", "X", "Y"]
 
 DISPLAY_WIDTH = 160
@@ -27,7 +27,7 @@ DISPLAY_HEIGHT = 80
 
 COLOR_WHITE = (255, 255, 255)
 COLOR_BLUE = (31, 137, 251)
-COLOR_GREEN = (99, 255, 124)
+COLOR_GREEN = (99, 255, 1)
 COLOR_YELLOW = (254, 219, 82)
 COLOR_RED = (247, 0, 63)
 COLOR_BLACK = (0, 0, 0)
@@ -90,7 +90,8 @@ class View:
         if position not in ["A", "B", "X", "Y"]:
             raise ValueError(f"Invalid label position {position}")
 
-        text_w, text_h = self._draw.textsize(text, font=self.font)
+        bbox = self._draw.textbbox((0, 0), text, font=self.font)
+        text_w, text_h = bbox[2] - bbox[0], bbox[3] - bbox[1]
         text_h = 11
         text_w += margin * 2
         text_h += margin * 2
@@ -143,7 +144,7 @@ class View:
 
                 while (
                     len(words) > 0
-                    and font.getsize(" ".join(line + [words[0]]))[0] <= width
+                    and font.getbbox(" ".join(line + [words[0]]))[2] <= width
                 ):
                     line.append(words.pop(0))
 
@@ -161,7 +162,7 @@ class View:
                 bounds = [x2, y, x1, y + len(lines) * line_height]
 
                 for line in lines:
-                    line_width = font.getsize(line)[0]
+                    line_width = font.getbbox(line)[2]
                     x = int(x1 + (width / 2) - (line_width / 2))
                     bounds[0] = min(bounds[0], x)
                     bounds[2] = max(bounds[2], x + line_width)
@@ -221,8 +222,9 @@ class MainView(View):
 
         self.icon(icon_channel, (x, label_y), (200, 200, 200) if active else (64, 64, 64))
 
-        # TODO: replace number text with graphic
-        tw, th = self.font.getsize(str(channel.channel))
+        # Replace number text with graphic
+        bbox = self.font.getbbox(str(channel.channel))
+        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
         self._draw.text(
             (x + int(math.ceil(8 - (tw / 2.0))), label_y + 1),
             str(channel.channel),
@@ -387,7 +389,7 @@ class ChannelView(View):
         View.__init__(self, image)
 
     def draw_status(self, position):
-        status = f"Sat: {self.channel.sensor.saturation * 100:.2f}%"
+        status = f"{self.channel.sensor.moisture:.2f}Hz {self.channel.sensor.saturation * 100:.2f}%"
 
         self._draw.text(
             position,
@@ -397,8 +399,9 @@ class ChannelView(View):
         )
 
     def draw_context(self, position, metric="Hz"):
-        context = f"Now: {self.channel.sensor.moisture:.2f}Hz"
-        if metric.lower() == "sat":
+        if metric.lower() == "hz":
+            context = f"Now: {self.channel.sensor.moisture:.2f}Hz"
+        else:  # metric == "sat"
             context = f"Now: {self.channel.sensor.saturation * 100:.2f}%"
 
         self._draw.text(
@@ -479,7 +482,8 @@ class DetailView(ChannelView):
 
         self.icon(icon_channel, (label_x, label_y), (200, 200, 200))
 
-        tw, th = self.font.getsize(str(self.channel.channel))
+        bbox = self.font.getbbox(str(self.channel.channel))
+        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
         self._draw.text(
             (label_x + int(math.ceil(8 - (tw / 2.0))), label_y + 1),
             str(self.channel.channel),
@@ -627,6 +631,7 @@ class Channel:
         display_channel,
         sensor_channel,
         pump_channel,
+        gpio_handle=None,
         title=None,
         water_level=0.5,
         warn_level=0.5,
@@ -640,8 +645,10 @@ class Channel:
         enabled=False,
     ):
         self.channel = display_channel
-        self.sensor = Moisture(sensor_channel)
-        self.pump = Pump(pump_channel)
+        self.sensor_channel = sensor_channel  # Store channel number
+        self.pump_channel = pump_channel  # Store channel number
+        self.sensor = None  # Initialize later
+        self.pump = None   # Initialize later
         self.water_level = water_level
         self.warn_level = warn_level
         self.auto_water = auto_water
@@ -655,9 +662,30 @@ class Channel:
         self._enabled = enabled
         self.alarm = False
         self.title = f"Channel {display_channel}" if title is None else title
+        self._gpio_handle = gpio_handle
 
-        self.sensor.set_wet_point(wet_point)
-        self.sensor.set_dry_point(dry_point)
+    def initialize(self):
+        """Initialize sensor and pump after GPIO is properly set up"""
+        try:
+            # Add delay between initializations
+            time.sleep(0.1)
+            
+            if self.sensor is None:                    
+                self.sensor = Moisture(self.sensor_channel, self._gpio_handle)
+                if self.sensor.active:  # Only set points if initialization succeeded
+                    self.sensor.set_wet_point(self._wet_point)
+                    self.sensor.set_dry_point(self._dry_point)
+                else:
+                    print(f"Warning: Moisture sensor {self.channel} failed to initialize")
+            
+            time.sleep(0.1)  # Delay between sensor and pump init
+            
+            if self.pump is None:
+                self.pump = Pump(self.pump_channel, self._gpio_handle)
+                
+        except Exception as e:
+            print(f"Error initializing channel {self.channel}: {e}")
+            raise
 
     @property
     def enabled(self):
@@ -753,7 +781,8 @@ Dry point: {dry_point}
     def render(self, image, font):
         pass
 
-    def update(self):
+    def update(self):  # Fix: Add self parameter
+        """Update channel status."""
         if not self.enabled:
             return
         sat = self.sensor.saturation
@@ -991,9 +1020,34 @@ class Config:
         self.set("general", settings)
 
 
+def test_display_pins():
+    """Force the display to use CE1 only."""
+    # Just skip the loop, explicitly pick `cs=1`.
+    try:
+        pin = 1  # CE1 => GPIO 7 => pin 26
+        logging.info(f"Testing pin {pin} for display CS...")
+        disp = ST7735.ST7735(
+        port=0,  
+        cs=0,     # CE1 => GPIO 7 => pin 26
+        dc=9, 
+        backlight=12, 
+        rotation=270, 
+        spi_speed_hz=10000000
+    )
+
+        
+        disp.begin()
+        # ... rest of display test ...
+        logging.info(f"Pin {pin} works for display!")
+        return pin
+    except Exception as e:
+        logging.error(f"Pin 1 (CE1) failed: {e}")
+        return None
+
+
 def main():
-    def handle_button(pin):
-        index = BUTTONS.index(pin)
+    def handle_button(chip, gpio, level, tick):
+        index = BUTTONS.index(gpio)
         label = LABELS[index]
 
         if label == "A":  # Select View
@@ -1013,140 +1067,169 @@ def main():
         if label == "Y":
             viewcontroller.button_y()
 
-
-    # Set up the ST7735 SPI Display
-    display = ST7735.ST7735(
-        port=0, cs=1, dc=9, backlight=12, rotation=270, spi_speed_hz=80000000
-    )
-    display.begin()
-
-    # Set up light sensor
-    light = ltr559.LTR559()
-
-    # Set up our canvas and prepare for drawing
-    image = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(255, 255, 255))
-
-    # Setup blank image for darkness
-    image_blank = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
-
-
-    # Pick a random selection of plant icons to display on screen
-    channels = [
-        Channel(1, 1, 1),
-        Channel(2, 2, 2),
-        Channel(3, 3, 3),
-    ]
-
-    alarm = Alarm(image)
-
-    config = Config()
-
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setwarnings(False)
-    GPIO.setup(BUTTONS, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
-    for pin in BUTTONS:
-        GPIO.add_event_detect(pin, GPIO.FALLING, handle_button, bouncetime=200)
-
-    config.load()
-
-    for channel in channels:
-        channel.update_from_yml(config.get_channel(channel.channel))
-
-    alarm.update_from_yml(config.get_general())
-
-    print("Channels:")
-    for channel in channels:
-        print(channel)
-
-    print(
-        """Settings:
-Alarm Enabled: {}
-Alarm Interval: {:.2f}s
-Low Light Set Screen To Black: {}
-Low Light Value {:.2f}
-""".format(
-            alarm.enabled,
-            alarm.interval,
-            config.get_general().get("black_screen_when_light_low"),
-            config.get_general().get("light_level_low")
+    try:
+        # Set up the ST7735 SPI Display according to the physical connections
+        display = ST7735.ST7735(
+            port=0,          # SPI0
+            cs=0,            # CE1 on GPIO 7 (Pin 26)
+            dc=9,            # GPIO 9 (Data/Command)
+            backlight=12,    # GPIO 12 (Backlight)
+            rotation=270,
+            spi_speed_hz=10000000
         )
-    )
 
-    main_options = [
-        {
-            "title": "Alarm Interval",
-            "prop": "interval",
-            "inc": 1,
-            "min": 1,
-            "max": 60,
-            "format": lambda value: f"{value:02.0f}sec",
-            "object": alarm,
-            "help": "Time between alarm beeps.",
-        },
-        {
-            "title": "Alarm Enable",
-            "prop": "enabled",
-            "mode": "bool",
-            "format": lambda value: "Yes" if value else "No",
-            "object": alarm,
-            "help": "Enable the piezo alarm beep.",
-        },
-    ]
+        # Initialize display
+        try:
+            display.begin()
+        except Exception as e:
+            logging.error(f"Failed to initialise display on CE1: {e}")
+            exit(1)
 
-    viewcontroller = ViewController(
-        [
-            (
-                MainView(image, channels=channels, alarm=alarm),
-                SettingsView(image, options=main_options),
-            ),
-            (
-                DetailView(image, channel=channels[0]),
-                ChannelEditView(image, channel=channels[0]),
-            ),
-            (
-                DetailView(image, channel=channels[1]),
-                ChannelEditView(image, channel=channels[1]),
-            ),
-            (
-                DetailView(image, channel=channels[2]),
-                ChannelEditView(image, channel=channels[2]),
-            ),
+        # Clear display by drawing a blank image
+        blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
+        display.display(blank_image)
+
+        # Width and height already defined as constants
+        # DISPLAY_WIDTH = 160
+        # DISPLAY_HEIGHT = 80
+
+        # Set up light sensor
+        light = ltr559.LTR559()
+
+        # Set up our canvas and prepare for drawing
+        image = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(255, 255, 255))
+        image_blank = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
+
+        # Clean up GPIO and initialize
+        h = GPIO.gpiochip_open(0)  # Store the handle
+        
+        # Set up button handlers
+        for pin in BUTTONS:
+            GPIO.gpio_claim_input(h, pin, GPIO.SET_PULL_UP)
+            GPIO.gpio_claim_alert(h, pin, GPIO.FALLING_EDGE, GPIO.SET_PULL_UP)
+            GPIO.callback(h, pin, GPIO.FALLING_EDGE, handle_button)
+            time.sleep(0.05)  # Short delay between button setups
+
+        # Initialize channels with channel numbers (1-3) for both moisture sensors and pumps
+        channels = [
+            Channel(1, 1, 1, gpio_handle=h),  # Display channel 1, Moisture sensor 1, Pump 1
+            Channel(2, 2, 2, gpio_handle=h),  # Display channel 2, Moisture sensor 2, Pump 2 
+            Channel(3, 3, 3, gpio_handle=h),  # Display channel 3, Moisture sensor 3, Pump 3
         ]
-    )
 
-    while True:
         for channel in channels:
-            config.set_channel(channel.channel, channel)
-            channel.update()
-            if channel.alarm:
-                alarm.trigger()
+            channel.initialize()
+            time.sleep(0.1)  # Short delay between channel initializations
 
-        light_level_low = light.get_lux() < config.get_general().get("light_level_low")
+        alarm = Alarm(image)
+        config = Config()
 
-        alarm.update(light_level_low)
+        config.load()
 
-        viewcontroller.update()
+        for channel in channels:
+            channel.update_from_yml(config.get_channel(channel.channel))
 
-        if light_level_low and config.get_general().get("black_screen_when_light_low"):
-            display.sleep()
-            display.display(image_blank.convert("RGB"))
-        else:
-            viewcontroller.render()
-            display.wake()
-            display.display(image.convert("RGB"))
+        alarm.update_from_yml(config.get_general())
 
-        config.set_general(
-            {
-                "alarm_enable": alarm.enabled,
-                "alarm_interval": alarm.interval,
-            }
+        print("Channels:")
+        for channel in channels:
+            print(channel)
+
+        print(
+            """Settings:
+    Alarm Enabled: {}
+    Alarm Interval: {:.2f}s
+    Low Light Set Screen To Black: {}
+    Low Light Value {:.2f}
+    """.format(
+                alarm.enabled,
+                alarm.interval,
+                config.get_general().get("black_screen_when_light_low"),
+                config.get_general().get("light_level_low")
+            )
         )
 
-        config.save()
+        main_options = [
+            {
+                "title": "Alarm Interval",
+                "prop": "interval",
+                "inc": 1,
+                "min": 1,
+                "max": 60,
+                "format": lambda value: f"{value:02.0f}sec",
+                "object": alarm,
+                "help": "Time between alarm beeps.",
+            },
+            {
+                "title": "Alarm Enable",
+                "prop": "enabled",
+                "mode": "bool",
+                "format": lambda value: "Yes" if value else "No",
+                "object": alarm,
+                "help": "Enable the piezo alarm beep.",
+            },
+        ]
 
-        time.sleep(1.0 / FPS)
+        viewcontroller = ViewController(
+            [
+                (
+                    MainView(image, channels=channels, alarm=alarm),
+                    SettingsView(image, options=main_options),
+                ),
+                (
+                    DetailView(image, channel=channels[0]),
+                    ChannelEditView(image, channel=channels[0]),
+                ),
+                (
+                    DetailView(image, channel=channels[1]),
+                    ChannelEditView(image, channel=channels[1]),
+                ),
+                (
+                    DetailView(image, channel=channels[2]),
+                    ChannelEditView(image, channel=channels[2]),
+                ),
+            ]
+        )
 
+        while True:
+            for channel in channels:
+                config.set_channel(channel.channel, channel)
+                channel.update()
+                if channel.alarm:
+                    alarm.trigger()
+
+            light_level_low = light.get_lux() < config.get_general().get("light_level_low")
+
+            alarm.update(light_level_low)
+
+            viewcontroller.update()
+
+            if light_level_low and config.get_general().get("black_screen_when_light_low"):
+                display.sleep()
+                display.display(image_blank.convert("RGB"))
+            else:
+                viewcontroller.render()
+                display.wake()
+                display.display(image.convert("RGB"))
+
+            config.set_general(
+                {
+                    "alarm_enable": alarm.enabled,
+                    "alarm_interval": alarm.interval,
+                }
+            )
+
+            config.save()
+
+            time.sleep(1.0 / FPS)
+
+    except KeyboardInterrupt:
+        print("\nExiting...")
+    finally:
+        try:
+            GPIO.gpiochip_close(h)  # Also fix the variable name to h instead of gpio_handle
+        except:
+            pass
 
 if __name__ == "__main__":
     main()
