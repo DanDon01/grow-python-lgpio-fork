@@ -38,4 +38,5 @@ def run_pump(pump_id):
         return jsonify({"status": "error", "message": "Invalid pump ID"}), 400
 
 if __name__ == '__main__':
+    logging.info("Starting Flask app...")
     app.run(host='0.0.0.0', port=5000)

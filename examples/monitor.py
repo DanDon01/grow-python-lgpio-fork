@@ -5,6 +5,8 @@ import pathlib
 import sys
 import threading
 import time
+import subprocess
+import os
 
 import ltr559
 import lgpio as GPIO  # Change the import to lgpio
@@ -53,6 +55,10 @@ class View:
 
         self.font = ImageFont.truetype(UserFont, 14)
         self.font_small = ImageFont.truetype(UserFont, 10)
+        
+    # Start the Flask app
+    flask_app_path = os.path.join(os.path.dirname(__file__), 'flask_app.py')
+    subprocess.Popen(['python', flask_app_path])       
 
     def button_a(self):
         return False
