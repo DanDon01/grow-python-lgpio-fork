@@ -462,7 +462,8 @@ class DetailView(ChannelView):
     """
 
     def render(self):
-        self.clear()
+        # Clear the display by drawing a black background
+        self._draw.rectangle((0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), fill=COLOR_BLACK)
 
         if self.channel.enabled:
             graph_height = DISPLAY_HEIGHT - 8 - 20
@@ -471,19 +472,24 @@ class DetailView(ChannelView):
             graph_x = (DISPLAY_WIDTH - graph_width) // 2
             graph_y = 8
 
+            # Draw the status text
             self.draw_status((graph_x, graph_y + graph_height + 4))
 
-            self._draw.rectangle((graph_x, graph_y, graph_x + graph_width, graph_y + graph_height), (50, 50, 50))
+            # Draw the graph background
+            self._draw.rectangle((graph_x, graph_y, graph_x + graph_width, graph_y + graph_height), fill=(50, 50, 50))
 
+            # Render the graph bars
             for x, value in enumerate(self.channel.sensor.history[:graph_width]):
                 color = self.channel.indicator_color(value)
                 h = value * graph_height
                 x = graph_x + graph_width - x - 1
-                self._draw.rectangle((x, graph_y + graph_height - h, x + 1, graph_y + graph_height), color)
+                self._draw.rectangle((x, graph_y + graph_height - h, x + 1, graph_y + graph_height), fill=color)
 
+            # Draw the alarm line
             alarm_line = int(self.channel.warn_level * graph_height)
             r = 255
             if self.channel.alarm:
+                # Pulsate the red line if the alarm is active
                 r = int(((math.sin(time.time() * 3 * math.pi) + 1.0) / 2.0) * 128) + 127
 
             self._draw.rectangle(
@@ -493,7 +499,7 @@ class DetailView(ChannelView):
                     DISPLAY_WIDTH - 40,
                     graph_height + 8 - alarm_line,
                 ),
-                (r, 0, 0),
+                fill=(r, 0, 0),
             )
             self._draw.rectangle(
                 (
@@ -502,17 +508,17 @@ class DetailView(ChannelView):
                     DISPLAY_WIDTH,
                     graph_height + 8 - alarm_line,
                 ),
-                (r, 0, 0),
+                fill=(r, 0, 0),
             )
 
+            # Render the alarm icon
             self.icon(
                 icon_alarm,
                 (DISPLAY_WIDTH - 40, graph_height + 8 - alarm_line - 10),
-                (r, 0, 0),
+                color=(r, 0, 0),
             )
 
         # Channel icons
-
         x_positions = [40, 72, 104]
         label_x = x_positions[self.channel.channel - 1]
         label_y = 0
@@ -524,6 +530,7 @@ class DetailView(ChannelView):
 
         self.icon(icon_channel, (label_x, label_y), (200, 200, 200))
 
+        # Render the channel number text
         bbox = self.font.getbbox(str(self.channel.channel))
         tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
         self._draw.text(
@@ -533,15 +540,11 @@ class DetailView(ChannelView):
             fill=(55, 55, 55) if active else (100, 100, 100),
         )
 
-        # Next button
+        # Render the next button
         self.icon(icon_backdrop, (0, 0), COLOR_WHITE)
         self.icon(icon_rightarrow, (3, 3), (55, 55, 55))
 
-        # Prev button
-        # self.icon(icon_backdrop, (0, DISPLAY_HEIGHT - 26), COLOR_WHITE)
-        # self.icon(icon_return, (3, DISPLAY_HEIGHT - 26 + 3), (55, 55, 55))
-
-        # Edit
+        # Render the edit button
         self.icon(icon_backdrop.rotate(180), (DISPLAY_WIDTH - 26, 0), COLOR_WHITE)
         self.icon(icon_settings, (DISPLAY_WIDTH - 19 - 3, 3), (55, 55, 55))
 
