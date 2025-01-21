@@ -54,9 +54,9 @@ class View:
         self.font = ImageFont.truetype(UserFont, 14)
         self.font_small = ImageFont.truetype(UserFont, 10)
 
-    # Start the Flask app
-    flask_app_path = os.path.join(os.path.dirname(__file__), 'flask_app.py')
-    subprocess.Popen(['python', flask_app_path])
+        # Remove Flask app start - we'll handle this differently
+        # flask_app_path = os.path.join(os.path.dirname(__file__), 'flask_app.py')
+        # subprocess.Popen(['python', flask_app_path])
 
     def button_a(self):
         return False
@@ -1194,26 +1194,17 @@ def main():
             },
         ]
 
-        viewcontroller = ViewController(
-            [
-                (
-                    MainView(image, channels=channels, alarm=alarm),
-                    SettingsView(image, options=main_options),
-                ),
-                (
-                    DetailView(image, channel=channels[0]),
-                    ChannelEditView(image, channel=channels[0]),
-                ),
-                (
-                    DetailView(image, channel=channels[1]),
-                    ChannelEditView(image, channel=channels[1]),
-                ),
-                (
-                    DetailView(image, channel=channels[2]),
-                    ChannelEditView(image, channel=channels[2]),
-                ),
-            ]
-        )
+        # Modify viewcontroller initialization to handle missing channels
+        views = [(MainView(image, channels=channels, alarm=alarm),
+                 SettingsView(image, options=main_options))]
+                 
+        for channel in channels:
+            views.append((
+                DetailView(image, channel=channel),
+                ChannelEditView(image, channel=channel)
+            ))
+
+        viewcontroller = ViewController(views)
 
         while True:
             try:
@@ -1263,4 +1254,6 @@ def main():
             pass
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    # Remove Flask app start from here - should be run separately
     main()

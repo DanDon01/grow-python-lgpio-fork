@@ -19,18 +19,27 @@ class Moisture:
         self._dry_point = 26.7
         self._h = gpio_handle if gpio_handle is not None else GPIO.gpiochip_open(0)
         self._owns_handle = gpio_handle is None
-        self.active = False  # Start inactive until successfully initialized
+        self.active = False
+        self.channel = channel
 
         try:
-            # Try to claim the pin without freeing first
+            # First try to free the pin in case it's stuck
+            try:
+                GPIO.gpio_free(self._h, self._gpio_pin)
+                time.sleep(0.1)
+            except:
+                pass
+
+            # Now claim it
             GPIO.gpio_claim_input(self._h, self._gpio_pin)
+            time.sleep(0.1)
             GPIO.gpio_claim_alert(self._h, self._gpio_pin, GPIO.RISING_EDGE)
             GPIO.callback(self._h, self._gpio_pin, GPIO.RISING_EDGE, self._event_handler)
             self.active = True
             logging.debug(f"Moisture sensor {channel} initialized on GPIO {self._gpio_pin}")
         except Exception as e:
-            logging.debug(f"Could not initialize moisture sensor {channel}: {e}")
-            # Don't raise, just stay inactive
+            logging.error(f"Could not initialize moisture sensor {channel}: {e}")
+            self.active = False
 
     def _event_handler(self, chip, gpio, level, timestamp):
         """Handle the GPIO edge event and calculate frequency."""
