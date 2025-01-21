@@ -54,6 +54,7 @@ def load_icons():
         icons['channel'] = Image.open("icons/icon-channel.png").convert("RGBA")
         icons['backdrop'] = Image.open("icons/icon-backdrop.png").convert("RGBA")
         icons['return'] = Image.open("icons/icon-return.png").convert("RGBA")
+        icons['chilli'] = Image.open("icons/veg-chilli.png").convert("RGBA")  # Add chilli icon
         logging.info("Icons loaded successfully")
         return icons
     except FileNotFoundError as e:
@@ -62,6 +63,7 @@ def load_icons():
     except Exception as e:
         logging.error(f"Error loading icons: {e}")
         return None
+
 
 class View:
     def __init__(self, image):
@@ -1083,7 +1085,7 @@ def main():
         elif label == "Y":
             if not viewcontroller.button_y():  # If `button_y` doesn't consume the event
                 logging.info("Y button pressed. Activating screensaver...")
-                draw_chilli_animation(display)  # Call the screensaver function
+                draw_chilli_animation(display, icons)  # Call the screensaver function
 
     # Add signal handler for graceful shutdown
     import signal
