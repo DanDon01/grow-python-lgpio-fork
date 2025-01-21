@@ -4,7 +4,7 @@ import logging
 
 # Update moisture sensor pins to match the correct pinout
 MOISTURE_1_PIN = 23  # GPIO 23 (Pin 16) - Moisture 1
-MOISTURE_2_PIN = 8   # GPIO 8  (Pin 24) - Moisture 2
+MOISTURE_2_PIN = 14  # Changed from 8 to 14 to avoid SPI conflict
 MOISTURE_3_PIN = 25  # GPIO 25 (Pin 22) - Moisture 3
 MOISTURE_INT_PIN = 4  # GPIO 4  (Pin 7)  - Moisture Int
 
@@ -75,7 +75,7 @@ class Moisture:
 
         # Calculate frequency after measurement window
         if now - self._measure_start >= 0.1:  # 100ms measurement window
-            self._freq = self._transitions * 5  # Convert to Hz (transitions/0.1s * 10)
+            self._freq = self._transitions * 5.0  # Convert to Hz (transitions/0.1s * 10)
             self._measure_start = None  # Reset for next measurement
             
         return self._freq
@@ -93,14 +93,22 @@ class Moisture:
         """Return history of saturation readings."""
         return self._history
 
-    @property
+    @property 
     def moisture(self):
         """Return the current moisture frequency in Hz."""
         if not self.active:
             return 0.0
         
         freq = self._measure_frequency()
-        self._history.append(self.saturation)
+        
+        # Only append to history after calculating saturation to avoid recursion
+        sat = 0.0
+        if freq > 0:
+            zero = self._dry_point
+            span = self._wet_point - self._dry_point
+            sat = max(0.0, min(1.0, (freq - zero) / span))
+            
+        self._history.append(sat)
         if len(self._history) > 96:
             self._history.pop(0)
             
@@ -113,13 +121,13 @@ class Moisture:
         if not self.active:
             return 0.0
 
-        moisture = self.moisture
+        moisture = self._measure_frequency()  # Use _measure_frequency directly
         if moisture == 0:
             return 0.0
+            
         zero = self._dry_point
         span = self._wet_point - self._dry_point
-        moisture = (moisture - zero) / span
-        return max(0.0, min(1.0, moisture))
+        return max(0.0, min(1.0, (moisture - zero) / span))
 
     def __del__(self):
         """Clean up GPIO resources when this object is destroyed."""
