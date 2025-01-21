@@ -21,8 +21,11 @@ from grow import Piezo
 from lgpio_moisture import Moisture  # Use our patched moisture module instead
 from lgpio_pump import Pump  # Use our patched pump module
 from chilli_screensaver import draw_chilli_animation
+from threading import Thread
+from threading import Event
 
-
+screensaver_stop_event = Event()
+screensaver_thread = None
 
 FPS = 10
 
@@ -1064,8 +1067,17 @@ def main():
     from chilli_screensaver import draw_chilli_animation
 
     def handle_button(chip, gpio, level, tick):
+        global screensaver_thread, screensaver_stop_event
         index = BUTTONS.index(gpio)
         label = LABELS[index]
+        print(f"Button pressed: {label}")  # Debug: Print which button was pressed
+        current_time = time()
+
+        # Debounce: Ignore presses within 0.3 seconds
+        if current_time - last_button_press < 0.3:
+            return
+
+        last_button_press = current_time  # Update last press time
         print(f"Button pressed: {label}")  # Debug: Print which button was pressed
 
         if label == "A":  # Select View
@@ -1083,10 +1095,19 @@ def main():
             viewcontroller.button_x()
 
         elif label == "Y":
-            if not viewcontroller.button_y():  # If `button_y` doesn't consume the event
-                logging.info("Y button pressed. Activating screensaver...")
-                draw_chilli_animation(display, icons)  # Call the screensaver function
-
+            if screensaver_thread and screensaver_thread.is_alive():
+                # Stop the screensaver
+                logging.info("Stopping screensaver...")
+                screensaver_stop_event.set()  # Signal the screensaver to stop
+                screensaver_thread.join()  # Wait for it to finish
+                screensaver_thread = None
+            else:
+                # Start the screensaver
+                logging.info("Starting screensaver...")
+                screensaver_stop_event.clear()  # Reset the stop event
+                screensaver_thread = Thread(target=draw_chilli_animation, args=(display, icons, screensaver_stop_event))
+                screensaver_thread.start()
+                
     # Add signal handler for graceful shutdown
     import signal
 
