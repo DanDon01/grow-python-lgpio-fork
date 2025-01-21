@@ -21,6 +21,7 @@ from grow import Piezo
 from lgpio_moisture import Moisture  # Use our patched moisture module instead
 from lgpio_pump import Pump  # Use our patched pump module
 
+
 FPS = 10
 
 BUTTONS = [5, 6, 16, 26]  # Updated Button Y to GPIO 26
@@ -67,11 +68,6 @@ class View:
 
         self.font = ImageFont.truetype(UserFont, 14)
         self.font_small = ImageFont.truetype(UserFont, 10)
-
-        # Remove Flask app start - we'll handle this differently
-        # flask_app_path = os.path.join(os.path.dirname(__file__), 'flask_app.py')
-        # subprocess.Popen(['python', flask_app_path])
-
     def button_a(self):
         return False
 
@@ -962,6 +958,18 @@ class ViewController:
     def button_y(self):
         return self.view.button_y()
 
+def button_y(self):
+    if self._help_mode:
+        return True
+    if self._change_mode:
+        # Handle existing behavior
+        ...
+    else:
+        # Trigger the screensaver
+        self.draw_chilli_animation()
+        draw_chilli_animation(self._image)
+    return True
+
 
 class Config:
     def __init__(self):
@@ -1085,6 +1093,9 @@ def main():
 
     # Add signal handler for graceful shutdown
     import signal
+    
+    from chilli_screensaver import draw_chilli_animation
+
     def signal_handler(signum, frame):
         print("\nShutting down gracefully...")
         try:
