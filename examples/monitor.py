@@ -49,6 +49,7 @@ def load_icons():
         icons['channel'] = Image.open("icons/icon-channel.png").convert("RGBA")
         icons['backdrop'] = Image.open("icons/icon-backdrop.png").convert("RGBA")
         icons['return'] = Image.open("icons/icon-return.png").convert("RGBA")
+        logging.info("Icons loaded successfully")
         return icons
     except FileNotFoundError as e:
         logging.error(f"Could not find icon files in icons/ directory: {e}")
@@ -1095,28 +1096,28 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    try:
-        # Moved icon loading to beginning of main()
-        icons = load_icons()
-        if icons is None:
-            print("Could not load required icons. Please ensure icons/ directory exists with required files.")
-            return
-            
-        # Make icons available to all classes that need them
-        global icon_drop, icon_nodrop, icon_rightarrow, icon_alarm, icon_snooze
-        global icon_help, icon_settings, icon_channel, icon_backdrop, icon_return
+    # Moved icon loading to beginning of main()
+    icons = load_icons()
+    if icons is None:
+        print("Could not load required icons. Please ensure icons/ directory exists with required files.")
+        return
         
-        icon_drop = icons['drop']
-        icon_nodrop = icons['nodrop']
-        icon_rightarrow = icons['rightarrow']
-        icon_alarm = icons['alarm']
-        icon_snooze = icons['snooze']
-        icon_help = icons['help']
-        icon_settings = icons['settings']
-        icon_channel = icons['channel']
-        icon_backdrop = icons['backdrop']
-        icon_return = icons['return']
+    # Make icons available to all classes that need them
+    global icon_drop, icon_nodrop, icon_rightarrow, icon_alarm, icon_snooze
+    global icon_help, icon_settings, icon_channel, icon_backdrop, icon_return
+    
+    icon_drop = icons['drop']
+    icon_nodrop = icons['nodrop']
+    icon_rightarrow = icons['rightarrow']
+    icon_alarm = icons['alarm']
+    icon_snooze = icons['snooze']
+    icon_help = icons['help']
+    icon_settings = icons['settings']
+    icon_channel = icons['channel']
+    icon_backdrop = icons['backdrop']
+    icon_return = icons['return']
 
+    try:
         # Set up the ST7735 SPI Display for CE1 on GPIO 7
         display = ST7735.ST7735(
             port=0,          # SPI0
@@ -1137,6 +1138,7 @@ def main():
         # Clear display by drawing a blank image
         blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
         display.display(blank_image)
+        logging.info("Display cleared with blank image")
 
         # Width and height already defined as constants
         # DISPLAY_WIDTH = 160
@@ -1144,13 +1146,16 @@ def main():
 
         # Set up light sensor
         light = ltr559.LTR559()
+        logging.info("Light sensor initialized")
 
         # Set up our canvas and prepare for drawing
         image = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(255, 255, 255))
         image_blank = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
+        logging.info("Canvas prepared for drawing")
 
         # Clean up GPIO and initialize
         h = GPIO.gpiochip_open(0)  # Store the handle
+        logging.info("GPIO handle opened successfully")
         
         # Set up button handlers
         for pin in BUTTONS:
@@ -1159,6 +1164,7 @@ def main():
                 GPIO.gpio_claim_alert(h, pin, GPIO.FALLING_EDGE, GPIO.SET_PULL_UP)
                 GPIO.callback(h, pin, GPIO.FALLING_EDGE, handle_button)
                 time.sleep(0.1)
+                logging.info(f"Button {pin} initialized successfully")
             except Exception as e:
                 logging.warning(f"Failed to initialize button {pin}: {e}")
 
@@ -1190,7 +1196,12 @@ def main():
         alarm = Alarm(image)
         config = Config()
 
-        config.load()
+        try:
+            config.load()
+            logging.info("Configuration loaded successfully")
+        except Exception as e:
+            logging.error(f"Failed to load configuration: {e}")
+            return
 
         for channel in channels:
             channel.update_from_yml(config.get_channel(channel.channel))
