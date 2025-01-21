@@ -34,7 +34,6 @@ COLOR_YELLOW = (254, 219, 82)
 COLOR_RED = (247, 0, 63)
 COLOR_BLACK = (0, 0, 0)
 
-
 # Only the ALPHA channel is used from these images
 icon_drop = Image.open("icons/icon-drop.png").convert("RGBA")
 icon_nodrop = Image.open("icons/icon-nodrop.png").convert("RGBA")
@@ -47,7 +46,6 @@ icon_channel = Image.open("icons/icon-channel.png").convert("RGBA")
 icon_backdrop = Image.open("icons/icon-backdrop.png").convert("RGBA")
 icon_return = Image.open("icons/icon-return.png").convert("RGBA")
 
-
 class View:
     def __init__(self, image):
         self._image = image
@@ -55,10 +53,10 @@ class View:
 
         self.font = ImageFont.truetype(UserFont, 14)
         self.font_small = ImageFont.truetype(UserFont, 10)
-        
+
     # Start the Flask app
     flask_app_path = os.path.join(os.path.dirname(__file__), 'flask_app.py')
-    subprocess.Popen(['python', flask_app_path])       
+    subprocess.Popen(['python', flask_app_path])
 
     def button_a(self):
         return False
