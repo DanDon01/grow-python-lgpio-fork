@@ -1207,6 +1207,8 @@ def main():
             backlight=12,    # GPIO 12 => Pin 32
             rotation=270,
             spi_speed_hz=10000000
+            colour_order=ST7735.BGR,
+            invert=False
         )
 
         try:
