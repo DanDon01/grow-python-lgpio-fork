@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, render_template, request
 import logging
-from grow.moisture import Moisture
-from grow.pump import Pump
+from examples.lgpio_moisture import Moisture
+from examples.lgpio_pump import Pump
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
