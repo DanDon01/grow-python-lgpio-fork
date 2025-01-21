@@ -1,24 +1,29 @@
-from grow.lcd import LCD
+from PIL import Image, ImageDraw
 from grow.icons import ICONS
-import time
 
-def draw_chilli_animation():
+def draw_chilli_animation(display):
     """Animate chilli icons across the screen."""
-    lcd = LCD()  # Initialize the LCD
-    chilli_icon = ICONS['chilli']  # Use the chilli icon from the library
+    # Create a blank image for the display
+    WIDTH = display.width
+    HEIGHT = display.height
+    img = Image.new("RGB", (WIDTH, HEIGHT), color=(0, 0, 0))
+    draw = ImageDraw.Draw(img)
 
-    lcd.clear()  # Clear the display
-    for x in range(0, lcd.WIDTH, 4):  # Move chilli icon across the screen
-        lcd.clear()
-        lcd.image(chilli_icon, x, lcd.HEIGHT // 2 - 4)  # Centered vertically
-        lcd.show()
-        time.sleep(0.2)  # Delay for animation
+    chilli_icon = ICONS["chilli"]  # Get the chilli icon from the library
 
-    for x in range(lcd.WIDTH - 4, -4, -4):  # Reverse direction
-        lcd.clear()
-        lcd.image(chilli_icon, x, lcd.HEIGHT // 2 - 4)
-        lcd.show()
+    # Loop for the animation
+    for x in range(0, WIDTH, 4):  # Move chilli icon left to right
+        draw.rectangle((0, 0, WIDTH, HEIGHT), fill=(0, 0, 0))  # Clear screen
+        draw.bitmap((x, HEIGHT // 2 - 4), chilli_icon, fill=(255, 0, 0))
+        display.display(img)  # Render image to the screen
         time.sleep(0.2)
 
-    lcd.clear()
-    lcd.show()
+    for x in range(WIDTH - 4, -4, -4):  # Move chilli icon right to left
+        draw.rectangle((0, 0, WIDTH, HEIGHT), fill=(0, 0, 0))  # Clear screen
+        draw.bitmap((x, HEIGHT // 2 - 4), chilli_icon, fill=(255, 0, 0))
+        display.display(img)  # Render image to the screen
+        time.sleep(0.2)
+
+    # Clear the display after animation
+    draw.rectangle((0, 0, WIDTH, HEIGHT), fill=(0, 0, 0))
+    display.display(img)

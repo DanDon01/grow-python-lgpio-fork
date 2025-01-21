@@ -958,19 +958,6 @@ class ViewController:
     def button_y(self):
         return self.view.button_y()
 
-def button_y(self):
-    if self._help_mode:
-        return True
-    if self._change_mode:
-        # Handle existing behavior
-        ...
-    else:
-        # Trigger the screensaver
-        self.draw_chilli_animation()
-        draw_chilli_animation(self._image)
-    return True
-
-
 class Config:
     def __init__(self):
         self.config = None
@@ -1085,11 +1072,13 @@ def main():
                     else:
                         alarm.sleep()
 
-        if label == "X":
-            viewcontroller.button_x()
+        elif label == "X":
+          viewcontroller.button_x()
 
-        if label == "Y":
-            viewcontroller.button_y()
+        elif label == "Y":
+           if not viewcontroller.button_y():  # If `button_y` doesn't consume the event
+             logging.info("Y button pressed. Activating screensaver...")
+             draw_chilli_animation(display)  # Call the screensaver function
 
     # Add signal handler for graceful shutdown
     import signal
