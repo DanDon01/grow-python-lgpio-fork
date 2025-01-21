@@ -1373,7 +1373,6 @@ def main():
         except:
             pass
 
-```
 if __name__ == "__main__":
     # Change logging level to INFO - this will hide DEBUG messages
     logging.basicConfig(
