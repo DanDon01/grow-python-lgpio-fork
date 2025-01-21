@@ -1206,8 +1206,8 @@ def main():
             dc=9,            # GPIO 9  => Pin 21 (Data/Command)
             backlight=12,    # GPIO 12 => Pin 32
             rotation=270,
-            spi_speed_hz=10000000,
-            invert=True
+            spi_speed_hz=80000000,
+            invert=False
         )
 
         try:
@@ -1218,7 +1218,7 @@ def main():
             exit(1)
 
         # Clear display by drawing a blank image
-        blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
+        blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(255, 255, 255))
         with display_lock:
             display.display(blank_image)
         logging.info("Display cleared with blank image")
@@ -1232,7 +1232,7 @@ def main():
         logging.info("Light sensor initialized")
 
         # Set up our canvas and prepare for drawing
-        image = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(255, 255, 255))
+        image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(255, 255, 255))
         image_blank = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
         logging.info("Canvas prepared for drawing")
 
