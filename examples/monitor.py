@@ -52,16 +52,27 @@ def load_icons():
     icons = {}
     try:
         icons['drop'] = Image.open("icons/icon-drop.png").convert("RGBA")
+        logging.info("Loaded icon-drop.png")
         icons['nodrop'] = Image.open("icons/icon-nodrop.png").convert("RGBA")
+        logging.info("Loaded icon-nodrop.png")
         icons['rightarrow'] = Image.open("icons/icon-rightarrow.png").convert("RGBA")
+        logging.info("Loaded icon-rightarrow.png")
         icons['alarm'] = Image.open("icons/icon-alarm.png").convert("RGBA")
+        logging.info("Loaded icon-alarm.png")
         icons['snooze'] = Image.open("icons/icon-snooze.png").convert("RGBA")
+        logging.info("Loaded icon-snooze.png")
         icons['help'] = Image.open("icons/icon-help.png").convert("RGBA")
+        logging.info("Loaded icon-help.png")
         icons['settings'] = Image.open("icons/icon-settings.png").convert("RGBA")
+        logging.info("Loaded icon-settings.png")
         icons['channel'] = Image.open("icons/icon-channel.png").convert("RGBA")
+        logging.info("Loaded icon-channel.png")
         icons['backdrop'] = Image.open("icons/icon-backdrop.png").convert("RGBA")
+        logging.info("Loaded icon-backdrop.png")
         icons['return'] = Image.open("icons/icon-return.png").convert("RGBA")
-        icons['chilli'] = Image.open("icons/veg-chilli.png").convert("RGBA")  # Add chilli icon
+        logging.info("Loaded icon-return.png")
+        icons['chilli'] = Image.open("icons/veg-chilli.png").convert("RGBA")
+        logging.info("Loaded veg-chilli.png")
         logging.info("Icons loaded successfully")
         return icons
     except FileNotFoundError as e:
@@ -1076,7 +1087,6 @@ def draw_chilli_animation(display, icons, stop_event):
         time.sleep(0.1)  # Adjust as needed
 
 def main():
-    from chilli_screensaver import draw_chilli_animation
     global screensaver_thread, screensaver_stop_event, last_button_press
 
     # Global variables
@@ -1126,11 +1136,9 @@ def main():
                 screensaver_thread = Thread(target=draw_chilli_animation, args=(display, icons, screensaver_stop_event))
                 screensaver_thread.start()
 
-                
     # Add signal handler for graceful shutdown
     import signal
 
-    
     def signal_handler(signum, frame):
         print("\nShutting down gracefully...")
         try:
@@ -1150,7 +1158,7 @@ def main():
         
     # Make icons available to all classes that need them
     global icon_drop, icon_nodrop, icon_rightarrow, icon_alarm, icon_snooze
-    global icon_help, icon_settings, icon_channel, icon_backdrop, icon_return
+    global icon_help, icon_settings, icon_channel, icon_backdrop, icon_return, icon_chilli
     
     icon_drop = icons['drop']
     icon_nodrop = icons['nodrop']
@@ -1162,6 +1170,7 @@ def main():
     icon_channel = icons['channel']
     icon_backdrop = icons['backdrop']
     icon_return = icons['return']
+    icon_chilli = icons['chilli']
 
     try:
         # Set up the ST7735 SPI Display for CE1 on GPIO 7
@@ -1364,6 +1373,7 @@ def main():
         except:
             pass
 
+```
 if __name__ == "__main__":
     # Change logging level to INFO - this will hide DEBUG messages
     logging.basicConfig(
@@ -1372,3 +1382,4 @@ if __name__ == "__main__":
         datefmt='%H:%M:%S'
     )
     main()
+

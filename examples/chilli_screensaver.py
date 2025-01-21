@@ -1,5 +1,6 @@
 from PIL import Image, ImageDraw, ImageFont
 import time
+from monitor import display_lock  # Import the display_lock from monitor.py
 
 def draw_chilli_animation(display, icons, stop_event):
     """Draw chilli animation on the display."""
