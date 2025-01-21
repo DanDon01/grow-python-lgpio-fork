@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grow Hat Information</title>
+    <title>Grow Monitor</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -51,13 +51,59 @@
             background-color: #45a049;
         }
     </style>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script>
+        function updateData() {
+            fetch('/sensors')
+                .then(response => response.json())
+                .then(data => {
+                    // Update current readings
+                    Object.entries(data).forEach(([channel, info]) => {
+                        document.getElementById(`${channel}-moisture`).textContent = 
+                            `${info.moisture.toFixed(2)} Hz`;
+                        document.getElementById(`${channel}-saturation`).textContent = 
+                            `${info.saturation.toFixed(2)}%`;
+                    });
+                });
+
+            // Update history graphs
+            fetch('/history')
+                .then(response => response.json())
+                .then(data => {
+                    Object.entries(data).forEach(([channel, history]) => {
+                        const trace = {
+                            y: history,
+                            type: 'scatter'
+                        };
+                        Plotly.newPlot(`${channel}-graph`, [trace]);
+                    });
+                });
+        }
+
+        // Update every 2 seconds
+        setInterval(updateData, 2000);
+    </script>
 </head>
 <body>
-    <h1>Grow Hat Information</h1>
+    <h1>Grow Monitor</h1>
     <div class="container">
-        <h2>Sensor Data</h2>
-        <div class="chart-container">
-            <canvas id="sensorChart"></canvas>
+        <div id="channel1">
+            <h2>Channel 1</h2>
+            <p>Moisture: <span id="channel1-moisture">--</span></p>
+            <p>Saturation: <span id="channel1-saturation">--</span></p>
+            <div id="channel1-graph"></div>
+        </div>
+        <div id="channel2">
+            <h2>Channel 2</h2>
+            <p>Moisture: <span id="channel2-moisture">--</span></p>
+            <p>Saturation: <span id="channel2-saturation">--</span></p>
+            <div id="channel2-graph"></div>
+        </div>
+        <div id="channel3">
+            <h2>Channel 3</h2>
+            <p>Moisture: <span id="channel3-moisture">--</span></p>
+            <p>Saturation: <span id="channel3-saturation">--</span></p>
+            <div id="channel3-graph"></div>
         </div>
         <h2>Logs</h2>
         <div class="logs" id="logs">

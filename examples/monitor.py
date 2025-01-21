@@ -7,6 +7,8 @@ import threading
 import time
 import subprocess
 import os
+import json
+from datetime import datetime
 
 import ltr559
 import lgpio as GPIO  # Change the import to lgpio
@@ -1036,6 +1038,29 @@ class Config:
         self.set("general", settings)
 
 
+def write_sensor_data(channels):
+    """Write current sensor data to JSON file for Flask app"""
+    data = {
+        'timestamp': datetime.now().isoformat(),
+        'sensors': {}
+    }
+    
+    for channel in channels:
+        if channel and channel.sensor and channel.sensor.active:
+            data['sensors'][f'channel{channel.channel}'] = {
+                'moisture': channel.sensor.moisture,
+                'saturation': channel.sensor.saturation * 100,
+                'alarm': channel.alarm,
+                'enabled': channel.enabled,
+                'history': channel.sensor.history
+            }
+    
+    try:
+        with open('sensor_data.json', 'w') as f:
+            json.dump(data, f)
+    except Exception as e:
+        logging.error(f"Failed to write sensor data: {e}")
+
 def main():
     def handle_button(chip, gpio, level, tick):
         index = BUTTONS.index(gpio)
@@ -1247,6 +1272,9 @@ def main():
                         channel.update()
                         if channel.alarm:
                             alarm.trigger()
+
+                # Write sensor data to file every cycle
+                write_sensor_data(channels)
 
                 light_level_low = light.get_lux() < config.get_general().get("light_level_low")
 
