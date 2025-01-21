@@ -48,7 +48,6 @@ def init_display(invert=False, spi_speed=8000000):
         logging.error(f"Failed to initialise display: {e}")
         return None
 
-# Draw test patterns
 def draw_test_pattern(display, colour, message):
     """Draw a test pattern with the specified colour and message."""
     image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), colour)
@@ -58,15 +57,17 @@ def draw_test_pattern(display, colour, message):
     except IOError:
         logging.warning("Custom font not found, using default font")
         font = ImageFont.load_default()
-    
+
     text = f"Testing: {message}"
-    text_width, text_height = draw.textsize(text, font=font)
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
     text_x = (DISPLAY_WIDTH - text_width) // 2
     text_y = (DISPLAY_HEIGHT - text_height) // 2
-    
+
     draw.text((text_x, text_y), text, fill=(0, 0, 0), font=font)
     display.display(image)
     time.sleep(2)
+
 
 # Test different configurations
 def run_tests():
