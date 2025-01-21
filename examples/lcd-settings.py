@@ -1,94 +1,93 @@
+#!/usr/bin/env python3
 import logging
 import time
-import sys
 from PIL import Image, ImageDraw, ImageFont
 import ST7735
-import termios
-import tty
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%H:%M:%S'
+)
 
-# Constants
+# Display dimensions
 DISPLAY_WIDTH = 160
 DISPLAY_HEIGHT = 80
-FONT_SIZE = 14
-ICON_PATH = "icons/veg-chilli.png"  # Change this to a valid icon path
 
-def wait_for_space():
-    """Wait for the user to press the space bar."""
-    print("Press SPACE to continue or Q to quit...", end="", flush=True)
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
+# Define colour sets
+COLOURS = [
+    ("White", (255, 255, 255)),
+    ("Red", (255, 0, 0)),
+    ("Green", (0, 255, 0)),
+    ("Blue", (0, 0, 255)),
+    ("Black", (0, 0, 0))
+]
+
+# Fonts for testing
+FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"  # Adjust if needed
+FONT_SIZE = 12
+
+# Create display instance
+def init_display(invert=False, spi_speed=8000000):
+    """Initialise the display with given settings."""
     try:
-        tty.setraw(fd)
-        while True:
-            ch = sys.stdin.read(1)
-            if ch == ' ':
-                break
-            elif ch.lower() == 'q':
-                print("\nExiting.")
-                sys.exit(0)
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-    print("\n")
+        display = ST7735.ST7735(
+            port=0,
+            cs=0,
+            dc=9,
+            backlight=12,
+            rotation=270,
+            spi_speed_hz=spi_speed,
+            invert=invert
+        )
+        display.begin()
+        logging.info(f"Display initialised: invert={invert}, spi_speed={spi_speed}")
+        return display
+    except Exception as e:
+        logging.error(f"Failed to initialise display: {e}")
+        return None
 
-def test_display(display, invert, bgr, spi_speed):
-    """Test the display with given settings."""
-    logging.info(f"Testing with invert={invert}, bgr={bgr}, spi_speed={spi_speed}")
-
-    # Initialize display
-    display = ST7735.ST7735(
-        port=0,
-        cs=0,  # Change to 1 if using CE1
-        dc=9,
-        backlight=12,
-        rotation=270,
-        spi_speed_hz=spi_speed,
-        invert=invert,
-        bgr=bgr
-    )
-    display.begin()
-
-    # Create image
-    image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(255, 255, 255))
+# Draw test patterns
+def draw_test_pattern(display, colour, message):
+    """Draw a test pattern with the specified colour and message."""
+    image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), colour)
     draw = ImageDraw.Draw(image)
-
-    # Draw background
-    draw.rectangle((0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), fill=(0, 128, 128))
-
-    # Load and draw icon
     try:
-        icon = Image.open(ICON_PATH).convert("RGBA")
-        image.paste(icon, (10, 10), mask=icon)
-    except FileNotFoundError:
-        logging.error(f"Icon not found at {ICON_PATH}")
-        draw.text((10, 10), "Icon Missing", fill=(255, 0, 0))
-
-    # Add text
-    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", FONT_SIZE)
-    draw.text((10, 60), f"Invert={invert}, BGR={bgr}\nSPI={spi_speed // 1_000_000}MHz", font=font, fill=(255, 255, 255))
-
-    # Display image
+        font = ImageFont.truetype(FONT_PATH, FONT_SIZE)
+    except IOError:
+        logging.warning("Custom font not found, using default font")
+        font = ImageFont.load_default()
+    
+    text = f"Testing: {message}"
+    text_width, text_height = draw.textsize(text, font=font)
+    text_x = (DISPLAY_WIDTH - text_width) // 2
+    text_y = (DISPLAY_HEIGHT - text_height) // 2
+    
+    draw.text((text_x, text_y), text, fill=(0, 0, 0), font=font)
     display.display(image)
+    time.sleep(2)
 
-def main():
-    settings = [
-        (invert, bgr, spi_speed)
-        for invert in [True, False]
-        for bgr in [True, False]
-        for spi_speed in [4000000, 10000000, 20000000, 40000000]
-    ]
+# Test different configurations
+def run_tests():
+    spi_speeds = [4000000, 8000000, 16000000]
+    invert_options = [False, True]
+    
+    for spi_speed in spi_speeds:
+        for invert in invert_options:
+            display = init_display(invert=invert, spi_speed=spi_speed)
+            if not display:
+                logging.error("Skipping tests due to display initialisation failure")
+                continue
 
-    logging.info("Starting display tests...")
+            logging.info(f"Running tests: invert={invert}, spi_speed={spi_speed}")
+            for colour_name, colour_value in COLOURS:
+                logging.info(f"Testing colour: {colour_name}")
+                draw_test_pattern(display, colour_value, f"{colour_name} (SPI={spi_speed})")
 
-    for invert, bgr, spi_speed in settings:
-        print(f"Testing: invert={invert}, bgr={bgr}, spi_speed={spi_speed // 1_000_000}MHz")
-        try:
-            test_display(None, invert, bgr, spi_speed)
-        except Exception as e:
-            logging.error(f"Error testing settings invert={invert}, bgr={bgr}, spi_speed={spi_speed}: {e}")
-        wait_for_space()
+            logging.info("Clearing display")
+            display.display(Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), (0, 0, 0)))
+            time.sleep(1)
 
 if __name__ == "__main__":
-    main()
+    run_tests()
