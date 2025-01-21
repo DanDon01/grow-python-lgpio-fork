@@ -13,7 +13,7 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
 
     while not stop_event.is_set():
         with display_lock:
-            image = Image.new("RGB", (width, height), (0, 0, 0))
+            image = Image.new("RGB", (width, height), (255, 255, 255))
             draw = ImageDraw.Draw(image)
             image.paste(chilli_icon, (x, y), chilli_icon)
             display.display(image)
