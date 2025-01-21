@@ -23,6 +23,7 @@ from lgpio_pump import Pump  # Use our patched pump module
 from chilli_screensaver import draw_chilli_animation
 from threading import Thread
 from threading import Event
+from threading import Lock
 
 screensaver_stop_event = Event()
 screensaver_thread = None
@@ -41,6 +42,9 @@ COLOR_GREEN = (99, 255, 1)
 COLOR_YELLOW = (254, 219, 82)
 COLOR_RED = (247, 0, 63)
 COLOR_BLACK = (0, 0, 0)
+
+# Global lock for display access
+display_lock = Lock()
 
 # Move icon loading inside main() and add error handling
 def load_icons():
@@ -1063,6 +1067,14 @@ def write_sensor_data(channels):
     except Exception as e:
         logging.error(f"Failed to write sensor data: {e}")
 
+def draw_chilli_animation(display, icons, stop_event):
+    """Draw chilli animation on the display."""
+    while not stop_event.is_set():
+        with display_lock:
+            # ...existing chilli animation code...
+            pass
+        time.sleep(0.1)  # Adjust as needed
+
 def main():
     from chilli_screensaver import draw_chilli_animation
     global screensaver_thread, screensaver_stop_event, last_button_press
@@ -1078,7 +1090,7 @@ def main():
         index = BUTTONS.index(gpio)
         label = LABELS[index]
 
-        current_time = time()
+        current_time = time.time()
         # Debounce: Ignore presses within 0.3 seconds
         if current_time - last_button_press < 0.3:
             return
@@ -1176,7 +1188,8 @@ def main():
 
         # Clear display by drawing a blank image
         blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
-        display.display(blank_image)
+        with display_lock:
+            display.display(blank_image)
         logging.info("Display cleared with blank image")
 
         # Width and height already defined as constants
@@ -1316,13 +1329,14 @@ def main():
 
                 viewcontroller.update()
 
-                if light_level_low and config.get_general().get("black_screen_when_light_low"):
-                    display.sleep()
-                    display.display(image_blank.convert("RGB"))
-                else:
-                    viewcontroller.render()
-                    display.wake()
-                    display.display(image.convert("RGB"))
+                with display_lock:
+                    if light_level_low and config.get_general().get("black_screen_when_light_low"):
+                        display.sleep()
+                        display.display(image_blank.convert("RGB"))
+                    else:
+                        viewcontroller.render()
+                        display.wake()
+                        display.display(image.convert("RGB"))
 
                 config.set_general(
                     {

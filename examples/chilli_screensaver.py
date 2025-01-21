@@ -1,34 +1,28 @@
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import time
 
 def draw_chilli_animation(display, icons, stop_event):
-    """Animate chilli icons across the screen until stop_event is set."""
-    WIDTH = display.width
-    HEIGHT = display.height
-
-    img = Image.new("RGB", (WIDTH, HEIGHT), color=(0, 0, 0))
+    """Draw chilli animation on the display."""
     chilli_icon = icons['chilli']
+    width, height = display.width, display.height
+    x, y = 0, 0
+    dx, dy = 1, 1
 
-    while not stop_event.is_set():  # Loop until stop_event is set
-        for x in range(0, WIDTH, 4):
-            if stop_event.is_set():
-                break
-            img.paste((0, 0, 0), [0, 0, WIDTH, HEIGHT])
-            img.paste(chilli_icon, (x, HEIGHT // 2 - 8), chilli_icon)
-            display.display(img)
-            time.sleep(0.1)
+    while not stop_event.is_set():
+        with display_lock:
+            image = Image.new("RGB", (width, height), (0, 0, 0))
+            draw = ImageDraw.Draw(image)
+            image.paste(chilli_icon, (x, y), chilli_icon)
+            display.display(image)
 
-        for x in range(WIDTH - 16, -16, -4):
-            if stop_event.is_set():
-                break
-            img.paste((0, 0, 0), [0, 0, WIDTH, HEIGHT])
-            img.paste(chilli_icon, (x, HEIGHT // 2 - 8), chilli_icon)
-            display.display(img)
-            time.sleep(0.1)
+        x += dx
+        y += dy
 
-    # Clear the screen when the screensaver stops
-    img.paste((0, 0, 0), [0, 0, WIDTH, HEIGHT])
-    display.display(img)
-    logging.info("Screensaver stopped and display cleared.")
+        if x + chilli_icon.width >= width or x <= 0:
+            dx = -dx
+        if y + chilli_icon.height >= height or y <= 0:
+            dy = -dy
+
+        time.sleep(0.05)
 
 
