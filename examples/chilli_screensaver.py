@@ -1,8 +1,10 @@
 from PIL import Image, ImageDraw, ImageFont
 import time
-from monitor import display_lock  # Import the display_lock from monitor.py
+import sys
+import os
+from threading import Event, Lock
 
-def draw_chilli_animation(display, icons, stop_event):
+def draw_chilli_animation(display, icons, stop_event, display_lock):
     """Draw chilli animation on the display."""
     chilli_icon = icons['chilli']
     width, height = display.width, display.height
@@ -25,5 +27,23 @@ def draw_chilli_animation(display, icons, stop_event):
             dy = -dy
 
         time.sleep(0.05)
+
+if __name__ == "__main__":
+    # This part will be executed when the script is run directly
+    from monitor import load_icons, display_lock
+    import ST7735
+
+    stop_event = Event()
+    icons = load_icons()
+    display = ST7735.ST7735(
+        port=0,
+        cs=0,
+        dc=9,
+        backlight=12,
+        rotation=270,
+        spi_speed_hz=10000000
+    )
+    display.begin()
+    draw_chilli_animation(display, icons, stop_event, display_lock)
 
 

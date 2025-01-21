@@ -1133,7 +1133,7 @@ def main():
                 # Start the screensaver
                 logging.info("Starting screensaver...")
                 screensaver_stop_event.clear()  # Reset the stop event
-                screensaver_thread = Thread(target=draw_chilli_animation, args=(display, icons, screensaver_stop_event))
+                screensaver_thread = subprocess.Popen([sys.executable, 'chilli_screensaver.py'])
                 screensaver_thread.start()
 
     # Add signal handler for graceful shutdown
