@@ -1085,19 +1085,19 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
 
     try:
-        # Set up the ST7735 SPI Display according to the physical connections
+        # Set up the ST7735 SPI Display for CE1 on GPIO 7
         display = ST7735.ST7735(
             port=0,          # SPI0
-            cs=0,            # CE1 on GPIO 7 (Pin 26)
-            dc=9,            # GPIO 9 (Data/Command)
-            backlight=12,    # GPIO 12 (Backlight)
+            cs=1,            # CE1 => GPIO 7 => Pin 26
+            dc=9,            # GPIO 9  => Pin 21 (Data/Command)
+            backlight=12,    # GPIO 12 => Pin 32
             rotation=270,
             spi_speed_hz=10000000
         )
 
-        # Initialize display
         try:
             display.begin()
+            logging.info("Display initialized successfully on CE1")
         except Exception as e:
             logging.error(f"Failed to initialise display on CE1: {e}")
             exit(1)

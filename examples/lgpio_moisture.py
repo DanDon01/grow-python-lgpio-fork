@@ -2,10 +2,10 @@ import time
 import lgpio as GPIO
 import logging
 
-# Update moisture sensor pins to match the correct pinout
-MOISTURE_1_PIN = 23  # GPIO 23 (Pin 16) - Moisture 1
-MOISTURE_2_PIN = 14  # Changed from 8 to 14 to avoid SPI conflict
-MOISTURE_3_PIN = 25  # GPIO 25 (Pin 22) - Moisture 3
+# Update moisture sensor pins to match working configuration
+MOISTURE_1_PIN = 23  # GPIO 23 (Pin 16)
+MOISTURE_2_PIN = 8   # GPIO 8  (Pin 24) 
+MOISTURE_3_PIN = 25  # GPIO 25 (Pin 22)
 MOISTURE_INT_PIN = 4  # GPIO 4  (Pin 7)  - Moisture Int
 
 # Track which pins are in use
