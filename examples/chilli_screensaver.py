@@ -42,7 +42,7 @@ if __name__ == "__main__":
         backlight=12,
         rotation=270,
         spi_speed_hz=80000000,
-        invert=False
+        invert=False,
         bgr=True
     )
     display.begin()
