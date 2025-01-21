@@ -1060,7 +1060,7 @@ def main():
     def handle_button(chip, gpio, level, tick):
         index = BUTTONS.index(gpio)
         label = LABELS[index]
-
+        print(f"Button pressed: {label}")  # Debug: Print which button was pressed
         if label == "A":  # Select View
             viewcontroller.button_a()
 
@@ -1317,6 +1317,10 @@ def main():
             pass
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    # Remove Flask app start from here - should be run separately
+    # Change logging level to INFO - this will hide DEBUG messages
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%H:%M:%S'
+    )
     main()

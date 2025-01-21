@@ -12,7 +12,7 @@ def draw_chilli_animation(display):
     draw = ImageDraw.Draw(img)
 
     # Load and resize the chilli icon
-    chilli_icon = Image.open("icons/chilli.png").resize((16, 16))
+    chilli_icon = Image.open("icons/veg-chilli.png").resize((16, 16))
 
     # Animate the chilli across the screen
     for x in range(0, WIDTH, 4):  # Move from left to right

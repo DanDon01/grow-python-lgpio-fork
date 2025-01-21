@@ -56,7 +56,7 @@ class Moisture:
     def _event_handler(self, chip, gpio, level, timestamp):
         """Handle the GPIO edge event and calculate frequency."""
         current_time = time.time() * 1000000  # Convert to microseconds
-        logging.info(f"Edge detected on GPIO {gpio} at {timestamp}")
+        logging.debug(f"Edge detected on GPIO {gpio} at {timestamp}")  # Changed to debug level
 
         if self._last_edge is not None:
             delta = current_time - self._last_edge
