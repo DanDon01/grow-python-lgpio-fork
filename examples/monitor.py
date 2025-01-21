@@ -1087,15 +1087,16 @@ def draw_chilli_animation(display, icons, stop_event):
         time.sleep(0.1)  # Adjust as needed
 
 def main():
-    global screensaver_thread, screensaver_stop_event, last_button_press
+    global screensaver_thread, screensaver_stop_event, last_button_press, screensaver_active
 
     # Global variables
     screensaver_thread = None
     screensaver_stop_event = Event()  # Event for stopping the screensaver
     last_button_press = 0
+    screensaver_active = False
 
     def handle_button(chip, gpio, level, tick):
-        global last_button_press, screensaver_thread, screensaver_stop_event
+        global last_button_press, screensaver_thread, screensaver_stop_event, screensaver_active
 
         index = BUTTONS.index(gpio)
         label = LABELS[index]
@@ -1123,18 +1124,19 @@ def main():
             viewcontroller.button_x()
 
         elif label == "Y":
-            if screensaver_thread and screensaver_thread.is_alive():
+            if screensaver_active:
                 # Stop the screensaver
                 logging.info("Stopping screensaver...")
                 screensaver_stop_event.set()  # Signal the screensaver to stop
-                screensaver_thread.join()  # Wait for it to finish
+                screensaver_thread.wait()  # Wait for it to finish
                 screensaver_thread = None
+                screensaver_active = False
             else:
                 # Start the screensaver
                 logging.info("Starting screensaver...")
                 screensaver_stop_event.clear()  # Reset the stop event
                 screensaver_thread = subprocess.Popen([sys.executable, 'chilli_screensaver.py'])
-                screensaver_thread.start()
+                screensaver_active = True
 
     # Add signal handler for graceful shutdown
     import signal
@@ -1339,6 +1341,10 @@ def main():
                 viewcontroller.update()
 
                 with display_lock:
+                    if screensaver_active:
+                        # Skip rendering if screensaver is active
+                        continue
+
                     if light_level_low and config.get_general().get("black_screen_when_light_low"):
                         display.sleep()
                         display.display(image_blank.convert("RGB"))
