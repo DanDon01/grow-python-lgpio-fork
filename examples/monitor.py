@@ -34,17 +34,28 @@ COLOR_YELLOW = (254, 219, 82)
 COLOR_RED = (247, 0, 63)
 COLOR_BLACK = (0, 0, 0)
 
-# Only the ALPHA channel is used from these images
-icon_drop = Image.open("icons/icon-drop.png").convert("RGBA")
-icon_nodrop = Image.open("icons/icon-nodrop.png").convert("RGBA")
-icon_rightarrow = Image.open("icons/icon-rightarrow.png").convert("RGBA")
-icon_alarm = Image.open("icons/icon-alarm.png").convert("RGBA")
-icon_snooze = Image.open("icons/icon-snooze.png").convert("RGBA")
-icon_help = Image.open("icons/icon-help.png").convert("RGBA")
-icon_settings = Image.open("icons/icon-settings.png").convert("RGBA")
-icon_channel = Image.open("icons/icon-channel.png").convert("RGBA")
-icon_backdrop = Image.open("icons/icon-backdrop.png").convert("RGBA")
-icon_return = Image.open("icons/icon-return.png").convert("RGBA")
+# Move icon loading inside main() and add error handling
+def load_icons():
+    """Load all required icons with error handling"""
+    icons = {}
+    try:
+        icons['drop'] = Image.open("icons/icon-drop.png").convert("RGBA")
+        icons['nodrop'] = Image.open("icons/icon-nodrop.png").convert("RGBA")
+        icons['rightarrow'] = Image.open("icons/icon-rightarrow.png").convert("RGBA")
+        icons['alarm'] = Image.open("icons/icon-alarm.png").convert("RGBA")
+        icons['snooze'] = Image.open("icons/icon-snooze.png").convert("RGBA")
+        icons['help'] = Image.open("icons/icon-help.png").convert("RGBA")
+        icons['settings'] = Image.open("icons/icon-settings.png").convert("RGBA")
+        icons['channel'] = Image.open("icons/icon-channel.png").convert("RGBA")
+        icons['backdrop'] = Image.open("icons/icon-backdrop.png").convert("RGBA")
+        icons['return'] = Image.open("icons/icon-return.png").convert("RGBA")
+        return icons
+    except FileNotFoundError as e:
+        logging.error(f"Could not find icon files in icons/ directory: {e}")
+        return None
+    except Exception as e:
+        logging.error(f"Error loading icons: {e}")
+        return None
 
 class View:
     def __init__(self, image):
@@ -1085,6 +1096,27 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
 
     try:
+        # Moved icon loading to beginning of main()
+        icons = load_icons()
+        if icons is None:
+            print("Could not load required icons. Please ensure icons/ directory exists with required files.")
+            return
+            
+        # Make icons available to all classes that need them
+        global icon_drop, icon_nodrop, icon_rightarrow, icon_alarm, icon_snooze
+        global icon_help, icon_settings, icon_channel, icon_backdrop, icon_return
+        
+        icon_drop = icons['drop']
+        icon_nodrop = icons['nodrop']
+        icon_rightarrow = icons['rightarrow']
+        icon_alarm = icons['alarm']
+        icon_snooze = icons['snooze']
+        icon_help = icons['help']
+        icon_settings = icons['settings']
+        icon_channel = icons['channel']
+        icon_backdrop = icons['backdrop']
+        icon_return = icons['return']
+
         # Set up the ST7735 SPI Display for CE1 on GPIO 7
         display = ST7735.ST7735(
             port=0,          # SPI0
