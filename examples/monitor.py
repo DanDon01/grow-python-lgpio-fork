@@ -1065,25 +1065,31 @@ def write_sensor_data(channels):
 
 def main():
     from chilli_screensaver import draw_chilli_animation
+    global screensaver_thread, screensaver_stop_event, last_button_press
+
+    # Global variables
+    screensaver_thread = None
+    screensaver_stop_event = Event()  # Event for stopping the screensaver
+    last_button_press = 0
 
     def handle_button(chip, gpio, level, tick):
-        global screensaver_thread, screensaver_stop_event
+        global last_button_press, screensaver_thread, screensaver_stop_event
+
         index = BUTTONS.index(gpio)
         label = LABELS[index]
-        print(f"Button pressed: {label}")  # Debug: Print which button was pressed
-        current_time = time()
 
+        current_time = time()
         # Debounce: Ignore presses within 0.3 seconds
         if current_time - last_button_press < 0.3:
             return
 
         last_button_press = current_time  # Update last press time
-        print(f"Button pressed: {label}")  # Debug: Print which button was pressed
+        print(f"Button pressed: {label}")  # Debug
 
-        if label == "A":  # Select View
+        if label == "A":
             viewcontroller.button_a()
 
-        elif label == "B":  # Sleep Alarm
+        elif label == "B":
             if not viewcontroller.button_b():
                 if viewcontroller.home:
                     if alarm.sleeping():
@@ -1107,6 +1113,7 @@ def main():
                 screensaver_stop_event.clear()  # Reset the stop event
                 screensaver_thread = Thread(target=draw_chilli_animation, args=(display, icons, screensaver_stop_event))
                 screensaver_thread.start()
+
                 
     # Add signal handler for graceful shutdown
     import signal
