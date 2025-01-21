@@ -1,29 +1,32 @@
 from PIL import Image, ImageDraw
-from grow.icons import ICONS
+import time
 
 def draw_chilli_animation(display):
     """Animate chilli icons across the screen."""
-    # Create a blank image for the display
+    # Screen dimensions
     WIDTH = display.width
     HEIGHT = display.height
+
+    # Create a blank image for the LCD
     img = Image.new("RGB", (WIDTH, HEIGHT), color=(0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    chilli_icon = ICONS["chilli"]  # Get the chilli icon from the library
+    # Load and resize the chilli icon
+    chilli_icon = Image.open("icons/chilli.png").resize((16, 16))
 
-    # Loop for the animation
-    for x in range(0, WIDTH, 4):  # Move chilli icon left to right
-        draw.rectangle((0, 0, WIDTH, HEIGHT), fill=(0, 0, 0))  # Clear screen
-        draw.bitmap((x, HEIGHT // 2 - 4), chilli_icon, fill=(255, 0, 0))
-        display.display(img)  # Render image to the screen
-        time.sleep(0.2)
+    # Animate the chilli across the screen
+    for x in range(0, WIDTH, 4):  # Move from left to right
+        img.paste((0, 0, 0), [0, 0, WIDTH, HEIGHT])  # Clear the screen
+        img.paste(chilli_icon, (x, HEIGHT // 2 - 8))  # Paste the chilli icon
+        display.display(img)
+        time.sleep(0.1)
 
-    for x in range(WIDTH - 4, -4, -4):  # Move chilli icon right to left
-        draw.rectangle((0, 0, WIDTH, HEIGHT), fill=(0, 0, 0))  # Clear screen
-        draw.bitmap((x, HEIGHT // 2 - 4), chilli_icon, fill=(255, 0, 0))
-        display.display(img)  # Render image to the screen
-        time.sleep(0.2)
+    for x in range(WIDTH - 16, -16, -4):  # Move from right to left
+        img.paste((0, 0, 0), [0, 0, WIDTH, HEIGHT])  # Clear the screen
+        img.paste(chilli_icon, (x, HEIGHT // 2 - 8))  # Paste the chilli icon
+        display.display(img)
+        time.sleep(0.1)
 
-    # Clear the display after animation
-    draw.rectangle((0, 0, WIDTH, HEIGHT), fill=(0, 0, 0))
+    # Clear the screen after the animation
+    img.paste((0, 0, 0), [0, 0, WIDTH, HEIGHT])
     display.display(img)
