@@ -1071,6 +1071,19 @@ def main():
         if label == "Y":
             viewcontroller.button_y()
 
+    # Add signal handler for graceful shutdown
+    import signal
+    def signal_handler(signum, frame):
+        print("\nShutting down gracefully...")
+        try:
+            GPIO.gpiochip_close(h)
+        except:
+            pass
+        exit(0)
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
     try:
         # Set up the ST7735 SPI Display according to the physical connections
         display = ST7735.ST7735(
@@ -1109,21 +1122,28 @@ def main():
         
         # Set up button handlers
         for pin in BUTTONS:
-            GPIO.gpio_claim_input(h, pin, GPIO.SET_PULL_UP)
-            GPIO.gpio_claim_alert(h, pin, GPIO.FALLING_EDGE, GPIO.SET_PULL_UP)
-            GPIO.callback(h, pin, GPIO.FALLING_EDGE, handle_button)
-            time.sleep(0.05)  # Short delay between button setups
+            try:
+                GPIO.gpio_claim_input(h, pin, GPIO.SET_PULL_UP)
+                GPIO.gpio_claim_alert(h, pin, GPIO.FALLING_EDGE, GPIO.SET_PULL_UP)
+                GPIO.callback(h, pin, GPIO.FALLING_EDGE, handle_button)
+                time.sleep(0.1)
+            except Exception as e:
+                logging.warning(f"Failed to initialize button {pin}: {e}")
 
-        # Initialize channels with channel numbers (1-3) for both moisture sensors and pumps
-        channels = [
-            Channel(1, 1, 1, gpio_handle=h),  # Display channel 1, Moisture sensor 1, Pump 1
-            Channel(2, 2, 2, gpio_handle=h),  # Display channel 2, Moisture sensor 2, Pump 2 
-            Channel(3, 3, 3, gpio_handle=h),  # Display channel 3, Moisture sensor 3, Pump 3
-        ]
-
-        for channel in channels:
-            channel.initialize()
-            time.sleep(0.1)  # Short delay between channel initializations
+        # Initialize channels sequentially with proper error handling
+        channels = []
+        for i in range(3):
+            try:
+                channel = Channel(i+1, i+1, i+1, gpio_handle=h)
+                channel.initialize()
+                channels.append(channel)
+                time.sleep(0.2)  # Longer delay between channels
+            except Exception as e:
+                logging.error(f"Failed to initialize channel {i+1}: {e}")
+                channels.append(None)
+        
+        # Filter out failed channels
+        channels = [c for c in channels if c is not None]
 
         alarm = Alarm(image)
         config = Config()
@@ -1196,40 +1216,47 @@ def main():
         )
 
         while True:
-            for channel in channels:
-                config.set_channel(channel.channel, channel)
-                channel.update()
-                if channel.alarm:
-                    alarm.trigger()
+            try:
+                for channel in channels:
+                    config.set_channel(channel.channel, channel)
+                    channel.update()
+                    if channel.alarm:
+                        alarm.trigger()
 
-            light_level_low = light.get_lux() < config.get_general().get("light_level_low")
+                light_level_low = light.get_lux() < config.get_general().get("light_level_low")
 
-            alarm.update(light_level_low)
+                alarm.update(light_level_low)
 
-            viewcontroller.update()
+                viewcontroller.update()
 
-            if light_level_low and config.get_general().get("black_screen_when_light_low"):
-                display.sleep()
-                display.display(image_blank.convert("RGB"))
-            else:
-                viewcontroller.render()
-                display.wake()
-                display.display(image.convert("RGB"))
+                if light_level_low and config.get_general().get("black_screen_when_light_low"):
+                    display.sleep()
+                    display.display(image_blank.convert("RGB"))
+                else:
+                    viewcontroller.render()
+                    display.wake()
+                    display.display(image.convert("RGB"))
 
-            config.set_general(
-                {
-                    "alarm_enable": alarm.enabled,
-                    "alarm_interval": alarm.interval,
-                }
-            )
+                config.set_general(
+                    {
+                        "alarm_enable": alarm.enabled,
+                        "alarm_interval": alarm.interval,
+                    }
+                )
 
-            config.save()
+                config.save()
 
-            time.sleep(1.0 / FPS)
+                time.sleep(1.0 / FPS)
+            except Exception as e:
+                logging.error(f"Error in main loop: {e}")
+                time.sleep(1)  # Prevent tight error loop
 
     except KeyboardInterrupt:
         print("\nExiting...")
+    except Exception as e:
+        logging.error(f"Fatal error: {e}")
     finally:
+        print("Cleaning up...")
         try:
             GPIO.gpiochip_close(h)  # Also fix the variable name to h instead of gpio_handle
         except:

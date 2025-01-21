@@ -17,43 +17,20 @@ class Moisture:
         self._last_edge = None
         self._wet_point = 0.7
         self._dry_point = 26.7
-        # If a gpio_handle is passed in, we use it; otherwise we open the default chip (chip 0).
         self._h = gpio_handle if gpio_handle is not None else GPIO.gpiochip_open(0)
         self._owns_handle = gpio_handle is None
-        self.active = True  # Will be set to False if we can't init
-
-        logging.info(f"Initializing Moisture sensor {channel} on GPIO {self._gpio_pin}")
+        self.active = False  # Start inactive until successfully initialized
 
         try:
-            # Attempt to free this GPIO in case it's already allocated.
-            try:
-                logging.info(f"Attempting to free GPIO {self._gpio_pin}")
-                GPIO.gpio_free(self._h, self._gpio_pin)
-            except Exception as e:
-                logging.warning(f"Could not free GPIO {self._gpio_pin}: {e}")
-
-            time.sleep(0.1)  # Let the system finalise the pin release
-
-            # Now claim it as an input
-            logging.info(f"Claiming GPIO {self._gpio_pin} as input")
+            # Try to claim the pin without freeing first
             GPIO.gpio_claim_input(self._h, self._gpio_pin)
-
-            # Set up edge detection for measuring frequency
-            try:
-                logging.info(f"Setting up edge detection on GPIO {self._gpio_pin}")
-                GPIO.gpio_claim_alert(self._h, self._gpio_pin, GPIO.RISING_EDGE)
-                GPIO.callback(self._h, self._gpio_pin, GPIO.RISING_EDGE, self._event_handler)
-                logging.info(f"Successfully registered callbacks for pin {self._gpio_pin}")
-            except Exception as e:
-                logging.error(f"Failed to register callbacks for pin {self._gpio_pin}: {e}")
-                self.active = False
-
+            GPIO.gpio_claim_alert(self._h, self._gpio_pin, GPIO.RISING_EDGE)
+            GPIO.callback(self._h, self._gpio_pin, GPIO.RISING_EDGE, self._event_handler)
+            self.active = True
+            logging.debug(f"Moisture sensor {channel} initialized on GPIO {self._gpio_pin}")
         except Exception as e:
-            # If we get here, likely the pin is busy or something else went wrong
-            logging.error(f"Failed to initialize GPIO {self._gpio_pin}: {e}")
-            self.active = False
-            # Removed the 'raise' so we don't crash everything
-            # raise
+            logging.debug(f"Could not initialize moisture sensor {channel}: {e}")
+            # Don't raise, just stay inactive
 
     def _event_handler(self, chip, gpio, level, timestamp):
         """Handle the GPIO edge event and calculate frequency."""
