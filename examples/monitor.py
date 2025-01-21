@@ -111,10 +111,16 @@ class View:
     def clear(self):
         self._draw.rectangle((0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), (0, 0, 0))
 
-    def icon(self, icon, position, color):
-        col = Image.new("RGBA", icon.size, color=color)
-        self._image.paste(col, position, mask=icon)
-
+    def icon(self, icon, position, color=None):
+        """Draw an icon on the display at the specified position."""
+        if color:
+            # Apply color overlay if needed
+            colored_icon = Image.new("RGBA", icon.size, color=color)
+            self._image.paste(colored_icon, position, mask=icon)
+        else:
+            # Directly paste the icon with its transparency
+            self._image.paste(icon, position, mask=icon)
+        
     def label(
         self,
         position="X",
@@ -1080,11 +1086,17 @@ def write_sensor_data(channels):
 
 def draw_chilli_animation(display, icons, stop_event):
     """Draw chilli animation on the display."""
+    chilli_icon = icons['chilli']
+    width, height = DISPLAY_WIDTH, DISPLAY_HEIGHT
+
     while not stop_event.is_set():
         with display_lock:
-            # ...existing chilli animation code...
-            pass
-        time.sleep(0.1)  # Adjust as needed
+            for x in range(0, width, chilli_icon.size[0] + 5):  # Adjust spacing as needed
+                for y in range(0, height, chilli_icon.size[1] + 5):
+                    display.image.paste(chilli_icon, (x, y), mask=chilli_icon)
+            display.display(display.image)
+        time.sleep(0.2)  # Adjust for animation speed
+
 
 def main():
     global screensaver_thread, screensaver_stop_event, last_button_press, screensaver_active
@@ -1131,6 +1143,10 @@ def main():
                 screensaver_thread.wait()  # Wait for it to finish
                 screensaver_thread = None
                 screensaver_active = False
+                # Ensure the display is updated after stopping the screensaver
+                with display_lock:
+                    viewcontroller.render()
+                    display.display(image.convert("RGB"))
             else:
                 # Start the screensaver
                 logging.info("Starting screensaver...")
