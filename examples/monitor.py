@@ -1130,20 +1130,30 @@ def main():
             except Exception as e:
                 logging.warning(f"Failed to initialize button {pin}: {e}")
 
-        # Initialize channels sequentially with proper error handling
+        # Initialize channels with more careful error handling and delays
         channels = []
         for i in range(3):
             try:
+                # Add longer delay between channel attempts
+                time.sleep(0.5)
+                
                 channel = Channel(i+1, i+1, i+1, gpio_handle=h)
                 channel.initialize()
-                channels.append(channel)
-                time.sleep(0.2)  # Longer delay between channels
+                
+                # Only add if both sensor and pump initialized successfully
+                if channel.sensor is not None and channel.sensor.active:
+                    channels.append(channel)
+                    logging.info(f"Successfully initialized channel {i+1}")
+                else:
+                    logging.error(f"Channel {i+1} sensor initialization failed")
+                    
             except Exception as e:
                 logging.error(f"Failed to initialize channel {i+1}: {e}")
-                channels.append(None)
         
-        # Filter out failed channels
-        channels = [c for c in channels if c is not None]
+        # Verify we have at least one working channel
+        if not channels:
+            logging.error("No channels could be initialized")
+            return
 
         alarm = Alarm(image)
         config = Config()

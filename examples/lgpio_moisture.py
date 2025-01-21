@@ -8,10 +8,18 @@ MOISTURE_2_PIN = 8   # GPIO 8  (Pin 24) - Moisture 2
 MOISTURE_3_PIN = 25  # GPIO 25 (Pin 22) - Moisture 3
 MOISTURE_INT_PIN = 4  # GPIO 4  (Pin 7)  - Moisture Int
 
+# Track which pins are in use
+_initialized_pins = set()
+
 class Moisture:
     def __init__(self, channel, gpio_handle=None):
         """Create a new moisture sensor instance for a specific channel (1-3)."""
         self._gpio_pin = [MOISTURE_1_PIN, MOISTURE_2_PIN, MOISTURE_3_PIN][channel - 1]
+        
+        # Check if pin is already in use
+        if self._gpio_pin in _initialized_pins:
+            raise RuntimeError(f"GPIO {self._gpio_pin} already in use")
+            
         self._history = []
         self._freq = 0.0
         self._last_edge = None
@@ -26,20 +34,34 @@ class Moisture:
             # First try to free the pin in case it's stuck
             try:
                 GPIO.gpio_free(self._h, self._gpio_pin)
-                time.sleep(0.1)
+                time.sleep(0.2)  # Longer delay after freeing
             except:
                 pass
 
             # Now claim it
             GPIO.gpio_claim_input(self._h, self._gpio_pin)
-            time.sleep(0.1)
+            time.sleep(0.2)  # Longer delay after claiming
+            
+            # Set up edge detection
             GPIO.gpio_claim_alert(self._h, self._gpio_pin, GPIO.RISING_EDGE)
+            time.sleep(0.2)  # Delay before callback
+            
             GPIO.callback(self._h, self._gpio_pin, GPIO.RISING_EDGE, self._event_handler)
+            
+            # Mark pin as in use
+            _initialized_pins.add(self._gpio_pin)
+            
             self.active = True
             logging.debug(f"Moisture sensor {channel} initialized on GPIO {self._gpio_pin}")
+            
         except Exception as e:
             logging.error(f"Could not initialize moisture sensor {channel}: {e}")
             self.active = False
+            # Try to clean up if initialization failed
+            try:
+                GPIO.gpio_free(self._h, self._gpio_pin)
+            except:
+                pass
 
     def _event_handler(self, chip, gpio, level, timestamp):
         """Handle the GPIO edge event and calculate frequency."""
@@ -99,7 +121,11 @@ class Moisture:
     def __del__(self):
         """Clean up GPIO resources when this object is destroyed."""
         try:
+            if self._gpio_pin in _initialized_pins:
+                _initialized_pins.remove(self._gpio_pin)
             if self._owns_handle:
                 GPIO.gpiochip_close(self._h)
+            else:
+                GPIO.gpio_free(self._h, self._gpio_pin)
         except:
             pass
