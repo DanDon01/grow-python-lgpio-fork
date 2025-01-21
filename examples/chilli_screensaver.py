@@ -43,7 +43,7 @@ if __name__ == "__main__":
         rotation=270,
         spi_speed_hz=80000000,
         invert=True,
-        bgr=True
+        bgr=False
     )
     display.begin()
     draw_chilli_animation(display, icons, stop_event, display_lock)
