@@ -22,7 +22,10 @@ class Moisture:
             
         self._history = []
         self._freq = 0.0
-        self._last_edge = None
+        self._last_value = 0
+        self._last_change = None
+        self._transitions = 0
+        self._measure_start = None
         self._wet_point = 0.7
         self._dry_point = 26.7
         self._h = gpio_handle if gpio_handle is not None else GPIO.gpiochip_open(0)
@@ -31,28 +34,13 @@ class Moisture:
         self.channel = channel
 
         try:
-            # First try to free the pin in case it's stuck
-            try:
-                GPIO.gpio_free(self._h, self._gpio_pin)
-                time.sleep(0.2)  # Longer delay after freeing
-            except:
-                pass
-
-            # Now claim it
+            # Simple input setup without edge detection
             GPIO.gpio_claim_input(self._h, self._gpio_pin)
-            time.sleep(0.2)  # Longer delay after claiming
-            
-            # Set up edge detection
-            GPIO.gpio_claim_alert(self._h, self._gpio_pin, GPIO.RISING_EDGE)
-            time.sleep(0.2)  # Delay before callback
-            
-            GPIO.callback(self._h, self._gpio_pin, GPIO.RISING_EDGE, self._event_handler)
+            self.active = True
+            logging.debug(f"Moisture sensor {channel} initialized on GPIO {self._gpio_pin}")
             
             # Mark pin as in use
             _initialized_pins.add(self._gpio_pin)
-            
-            self.active = True
-            logging.debug(f"Moisture sensor {channel} initialized on GPIO {self._gpio_pin}")
             
         except Exception as e:
             logging.error(f"Could not initialize moisture sensor {channel}: {e}")
@@ -63,21 +51,34 @@ class Moisture:
             except:
                 pass
 
-    def _event_handler(self, chip, gpio, level, timestamp):
-        """Handle the GPIO edge event and calculate frequency."""
-        current_time = time.time() * 1000000  # Convert to microseconds
-        logging.info(f"Edge detected on GPIO {gpio} at {timestamp}")
+    def _measure_frequency(self):
+        """Poll GPIO and measure frequency over a fixed time window"""
+        if not self.active:
+            return 0.0
 
-        if self._last_edge is not None:
-            delta = current_time - self._last_edge
-            if delta > 0:
-                # Calculate frequency from the time difference between edges
-                self._freq = 1000000.0 / delta
-                self._history.append(self.saturation)
-                if len(self._history) > 96:  # maintain a max of 96 samples
-                    self._history.pop(0)
+        now = time.time()
+        
+        # Start new measurement window
+        if self._measure_start is None:
+            self._measure_start = now
+            self._transitions = 0
+            self._last_value = GPIO.gpio_read(self._h, self._gpio_pin)
+            return self._freq  # Return last known frequency
 
-        self._last_edge = current_time
+        # Read current value
+        value = GPIO.gpio_read(self._h, self._gpio_pin)
+        
+        # Count transitions
+        if value != self._last_value:
+            self._transitions += 1
+            self._last_value = value
+
+        # Calculate frequency after measurement window
+        if now - self._measure_start >= 0.1:  # 100ms measurement window
+            self._freq = self._transitions * 5  # Convert to Hz (transitions/0.1s * 10)
+            self._measure_start = None  # Reset for next measurement
+            
+        return self._freq
 
     def set_wet_point(self, freq):
         """Set the frequency for 100% saturation."""
@@ -95,13 +96,15 @@ class Moisture:
     @property
     def moisture(self):
         """Return the current moisture frequency in Hz."""
-        # If we never successfully initialised or the pin is busy, just return 0.
         if not self.active:
             return 0.0
-        # If too long passes without an edge, also read 0 frequency
-        if self._last_edge is None or (time.time() * 1000000 - self._last_edge) > 1000000:
-            self._freq = 0
-        return self._freq
+        
+        freq = self._measure_frequency()
+        self._history.append(self.saturation)
+        if len(self._history) > 96:
+            self._history.pop(0)
+            
+        return freq
 
     @property
     def saturation(self):

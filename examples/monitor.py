@@ -1218,11 +1218,12 @@ def main():
 
         while True:
             try:
+                # Update channels
                 for channel in channels:
-                    config.set_channel(channel.channel, channel)
-                    channel.update()
-                    if channel.alarm:
-                        alarm.trigger()
+                    if channel and channel.sensor and channel.sensor.active:
+                        channel.update()
+                        if channel.alarm:
+                            alarm.trigger()
 
                 light_level_low = light.get_lux() < config.get_general().get("light_level_low")
 
@@ -1247,7 +1248,8 @@ def main():
 
                 config.save()
 
-                time.sleep(1.0 / FPS)
+                time.sleep(1.0 / FPS)  # Slower updates
+                
             except Exception as e:
                 logging.error(f"Error in main loop: {e}")
                 time.sleep(1)  # Prevent tight error loop
