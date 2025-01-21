@@ -8,7 +8,6 @@ import time
 import subprocess
 import os
 
-import ltr559
 import lgpio as GPIO  # Change the import to lgpio
 import ST7735
 import yaml
