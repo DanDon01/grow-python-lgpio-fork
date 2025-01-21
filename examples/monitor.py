@@ -20,6 +20,8 @@ from PIL import Image, ImageDraw, ImageFont
 from grow import Piezo
 from lgpio_moisture import Moisture  # Use our patched moisture module instead
 from lgpio_pump import Pump  # Use our patched pump module
+from chilli_screensaver import draw_chilli_animation
+
 
 
 FPS = 10
@@ -1057,14 +1059,17 @@ def write_sensor_data(channels):
         logging.error(f"Failed to write sensor data: {e}")
 
 def main():
+    from chilli_screensaver import draw_chilli_animation
+
     def handle_button(chip, gpio, level, tick):
         index = BUTTONS.index(gpio)
         label = LABELS[index]
         print(f"Button pressed: {label}")  # Debug: Print which button was pressed
+
         if label == "A":  # Select View
             viewcontroller.button_a()
 
-        if label == "B":  # Sleep Alarm
+        elif label == "B":  # Sleep Alarm
             if not viewcontroller.button_b():
                 if viewcontroller.home:
                     if alarm.sleeping():
@@ -1073,18 +1078,17 @@ def main():
                         alarm.sleep()
 
         elif label == "X":
-          viewcontroller.button_x()
+            viewcontroller.button_x()
 
         elif label == "Y":
-           if not viewcontroller.button_y():  # If `button_y` doesn't consume the event
-             logging.info("Y button pressed. Activating screensaver...")
-             draw_chilli_animation(display)  # Call the screensaver function
+            if not viewcontroller.button_y():  # If `button_y` doesn't consume the event
+                logging.info("Y button pressed. Activating screensaver...")
+                draw_chilli_animation(display)  # Call the screensaver function
 
     # Add signal handler for graceful shutdown
     import signal
-    
-    from chilli_screensaver import draw_chilli_animation
 
+    
     def signal_handler(signum, frame):
         print("\nShutting down gracefully...")
         try:
