@@ -26,7 +26,7 @@ from chilli_screensaver import draw_chilli_animation
 
 FPS = 10
 
-BUTTONS = [5, 6, 16, 26]  # Updated Button Y to GPIO 26
+BUTTONS = [5, 6, 16, 24]  
 LABELS = ["A", "B", "X", "Y"]
 
 DISPLAY_WIDTH = 160
