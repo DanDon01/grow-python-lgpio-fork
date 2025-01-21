@@ -1036,31 +1036,6 @@ class Config:
         self.set("general", settings)
 
 
-def test_display_pins():
-    """Force the display to use CE1 only."""
-    # Just skip the loop, explicitly pick `cs=1`.
-    try:
-        pin = 1  # CE1 => GPIO 7 => pin 26
-        logging.info(f"Testing pin {pin} for display CS...")
-        disp = ST7735.ST7735(
-        port=0,  
-        cs=0,     # CE1 => GPIO 7 => pin 26
-        dc=9, 
-        backlight=12, 
-        rotation=270, 
-        spi_speed_hz=10000000
-    )
-
-        
-        disp.begin()
-        # ... rest of display test ...
-        logging.info(f"Pin {pin} works for display!")
-        return pin
-    except Exception as e:
-        logging.error(f"Pin 1 (CE1) failed: {e}")
-        return None
-
-
 def main():
     def handle_button(chip, gpio, level, tick):
         index = BUTTONS.index(gpio)
@@ -1119,9 +1094,14 @@ def main():
 
     try:
         # Set up the ST7735 SPI Display for CE1 on GPIO 7
+        # Run: ls /dev/spidev0.*
+        # See if you have /dev/spidev0.0 or /dev/spidev0.1 (or both).
+        # If you only see spidev0.0, you need cs=0 in Python.
+        # If you only see spidev0.1, you need cs=1 in Python.
+        # Currently have spidev0.0 
         display = ST7735.ST7735(
             port=0,          # SPI0
-            cs=1,            # CE1 => GPIO 7 => Pin 26
+            cs=0,            # CE1 => GPIO 7 => Pin 26
             dc=9,            # GPIO 9  => Pin 21 (Data/Command)
             backlight=12,    # GPIO 12 => Pin 32
             rotation=270,

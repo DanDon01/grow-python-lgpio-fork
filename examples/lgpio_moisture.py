@@ -2,83 +2,71 @@ import time
 import lgpio as GPIO
 import logging
 
-# Update moisture sensor pins to match working configuration
-MOISTURE_1_PIN = 23  # GPIO 23 (Pin 16)
-MOISTURE_2_PIN = 8   # GPIO 8  (Pin 24) 
-MOISTURE_3_PIN = 25  # GPIO 25 (Pin 22)
+# Update moisture sensor pins to match the correct pinout
+MOISTURE_1_PIN = 23  # GPIO 23 (Pin 16) - Moisture 1
+MOISTURE_2_PIN = 8   # GPIO 8  (Pin 24) - Moisture 2
+MOISTURE_3_PIN = 25  # GPIO 25 (Pin 22) - Moisture 3
 MOISTURE_INT_PIN = 4  # GPIO 4  (Pin 7)  - Moisture Int
-
-# Track which pins are in use
-_initialized_pins = set()
 
 class Moisture:
     def __init__(self, channel, gpio_handle=None):
         """Create a new moisture sensor instance for a specific channel (1-3)."""
         self._gpio_pin = [MOISTURE_1_PIN, MOISTURE_2_PIN, MOISTURE_3_PIN][channel - 1]
-        
-        # Check if pin is already in use
-        if self._gpio_pin in _initialized_pins:
-            raise RuntimeError(f"GPIO {self._gpio_pin} already in use")
-            
         self._history = []
         self._freq = 0.0
-        self._last_value = 0
-        self._last_change = None
-        self._transitions = 0
-        self._measure_start = None
+        self._last_edge = None
         self._wet_point = 0.7
         self._dry_point = 26.7
         self._h = gpio_handle if gpio_handle is not None else GPIO.gpiochip_open(0)
         self._owns_handle = gpio_handle is None
-        self.active = False
-        self.channel = channel
+        self.active = True
+        
+        logging.info(f"Initializing Moisture sensor {channel} on GPIO {self._gpio_pin}")
 
+        # Configure GPIO - with error handling and cleanup
         try:
-            # Simple input setup without edge detection
-            GPIO.gpio_claim_input(self._h, self._gpio_pin)
-            self.active = True
-            logging.debug(f"Moisture sensor {channel} initialized on GPIO {self._gpio_pin}")
-            
-            # Mark pin as in use
-            _initialized_pins.add(self._gpio_pin)
-            
-        except Exception as e:
-            logging.error(f"Could not initialize moisture sensor {channel}: {e}")
-            self.active = False
-            # Try to clean up if initialization failed
+            # First try to free the GPIO in case it's already claimed
             try:
+                logging.info(f"Attempting to free GPIO {self._gpio_pin}")
                 GPIO.gpio_free(self._h, self._gpio_pin)
-            except:
-                pass
+            except Exception as e:
+                logging.warning(f"Could not free GPIO {self._gpio_pin}: {e}")
 
-    def _measure_frequency(self):
-        """Poll GPIO and measure frequency over a fixed time window"""
-        if not self.active:
-            return 0.0
+            time.sleep(0.1)  # Give system time to release the pin
 
-        now = time.time()
-        
-        # Start new measurement window
-        if self._measure_start is None:
-            self._measure_start = now
-            self._transitions = 0
-            self._last_value = GPIO.gpio_read(self._h, self._gpio_pin)
-            return self._freq  # Return last known frequency
-
-        # Read current value
-        value = GPIO.gpio_read(self._h, self._gpio_pin)
-        
-        # Count transitions
-        if value != self._last_value:
-            self._transitions += 1
-            self._last_value = value
-
-        # Calculate frequency after measurement window
-        if now - self._measure_start >= 0.1:  # 100ms measurement window
-            self._freq = self._transitions * 5.0  # Convert to Hz (transitions/0.1s * 10)
-            self._measure_start = None  # Reset for next measurement
+            # Now claim it as input
+            logging.info(f"Claiming GPIO {self._gpio_pin} as input")
+            GPIO.gpio_claim_input(self._h, self._gpio_pin)
             
-        return self._freq
+            # Set up edge detection
+            try:
+                logging.info(f"Setting up edge detection on GPIO {self._gpio_pin}")
+                GPIO.gpio_claim_alert(self._h, self._gpio_pin, GPIO.RISING_EDGE)
+                GPIO.callback(self._h, self._gpio_pin, GPIO.RISING_EDGE, self._event_handler)
+                logging.info(f"Successfully registered callbacks for pin {self._gpio_pin}")
+            except Exception as e:
+                logging.error(f"Failed to register callbacks for pin {self._gpio_pin}: {e}")
+                self.active = False
+                
+        except Exception as e:
+            logging.error(f"Failed to initialize GPIO {self._gpio_pin}: {e}")
+            self.active = False
+            raise
+
+    def _event_handler(self, chip, gpio, level, timestamp):
+        """Handle the GPIO edge event and calculate frequency."""
+        current_time = time.time() * 1000000  # Convert to microseconds
+        logging.info(f"Edge detected on GPIO {gpio} at {timestamp}")
+
+        if self._last_edge is not None:
+            delta = current_time - self._last_edge
+            if delta > 0:
+                self._freq = 1000000.0 / delta  # Convert from microseconds to Hz
+                self._history.append(self.saturation)
+                if len(self._history) > 96:  # Maintain 96 samples
+                    self._history.pop(0)
+        
+        self._last_edge = current_time
 
     def set_wet_point(self, freq):
         """Set the frequency for 100% saturation."""
@@ -93,50 +81,28 @@ class Moisture:
         """Return history of saturation readings."""
         return self._history
 
-    @property 
+    @property
     def moisture(self):
         """Return the current moisture frequency in Hz."""
-        if not self.active:
-            return 0.0
-        
-        freq = self._measure_frequency()
-        
-        # Only append to history after calculating saturation to avoid recursion
-        sat = 0.0
-        if freq > 0:
-            zero = self._dry_point
-            span = self._wet_point - self._dry_point
-            sat = max(0.0, min(1.0, (freq - zero) / span))
-            
-        self._history.append(sat)
-        if len(self._history) > 96:
-            self._history.pop(0)
-            
-        return freq
+        if self._last_edge is None or (time.time() * 1000000 - self._last_edge) > 1000000:  # 1 second timeout
+            self._freq = 0
+        return self._freq
 
     @property
     def saturation(self):
-        """Return the current saturation as a float between 0.0 and 1.0."""
-        # If not active, no data can be collected
-        if not self.active:
-            return 0.0
-
-        moisture = self._measure_frequency()  # Use _measure_frequency directly
+        """Return the current saturation as float 0.0 to 1.0."""
+        moisture = self.moisture
         if moisture == 0:
             return 0.0
-            
         zero = self._dry_point
         span = self._wet_point - self._dry_point
-        return max(0.0, min(1.0, (moisture - zero) / span))
+        moisture = (moisture - zero) / span
+        return max(0.0, min(1.0, moisture))
 
     def __del__(self):
-        """Clean up GPIO resources when this object is destroyed."""
+        """Clean up GPIO resources."""
         try:
-            if self._gpio_pin in _initialized_pins:
-                _initialized_pins.remove(self._gpio_pin)
             if self._owns_handle:
                 GPIO.gpiochip_close(self._h)
-            else:
-                GPIO.gpio_free(self._h, self._gpio_pin)
         except:
             pass
