@@ -46,41 +46,31 @@ COLOR_BLACK = (0, 0, 0)
 # Global lock for display access
 display_lock = Lock()
 
-# Move icon loading inside main() and add error handling
 def load_icons():
     """Load all required icons with error handling"""
+    icon_files = {
+        'drop': "icons/icon-drop.png",
+        'nodrop': "icons/icon-nodrop.png",
+        'rightarrow': "icons/icon-rightarrow.png",
+        'alarm': "icons/icon-alarm.png",
+        'snooze': "icons/icon-snooze.png",
+        'help': "icons/icon-help.png",
+        'settings': "icons/icon-settings.png",
+        'channel': "icons/icon-channel.png",
+        'backdrop': "icons/icon-backdrop.png",
+        'return': "icons/icon-return.png",
+        'chilli': "icons/veg-chilli.png",
+    }
     icons = {}
-    try:
-        icons['drop'] = Image.open("icons/icon-drop.png").convert("RGBA")
-        logging.info("Loaded icon-drop.png")
-        icons['nodrop'] = Image.open("icons/icon-nodrop.png").convert("RGBA")
-        logging.info("Loaded icon-nodrop.png")
-        icons['rightarrow'] = Image.open("icons/icon-rightarrow.png").convert("RGBA")
-        logging.info("Loaded icon-rightarrow.png")
-        icons['alarm'] = Image.open("icons/icon-alarm.png").convert("RGBA")
-        logging.info("Loaded icon-alarm.png")
-        icons['snooze'] = Image.open("icons/icon-snooze.png").convert("RGBA")
-        logging.info("Loaded icon-snooze.png")
-        icons['help'] = Image.open("icons/icon-help.png").convert("RGBA")
-        logging.info("Loaded icon-help.png")
-        icons['settings'] = Image.open("icons/icon-settings.png").convert("RGBA")
-        logging.info("Loaded icon-settings.png")
-        icons['channel'] = Image.open("icons/icon-channel.png").convert("RGBA")
-        logging.info("Loaded icon-channel.png")
-        icons['backdrop'] = Image.open("icons/icon-backdrop.png").convert("RGBA")
-        logging.info("Loaded icon-backdrop.png")
-        icons['return'] = Image.open("icons/icon-return.png").convert("RGBA")
-        logging.info("Loaded icon-return.png")
-        icons['chilli'] = Image.open("icons/veg-chilli.png").convert("RGBA")
-        logging.info("Loaded veg-chilli.png")
-        logging.info("Icons loaded successfully")
-        return icons
-    except FileNotFoundError as e:
-        logging.error(f"Could not find icon files in icons/ directory: {e}")
-        return None
-    except Exception as e:
-        logging.error(f"Error loading icons: {e}")
-        return None
+    for name, path in icon_files.items():
+        try:
+            icons[name] = Image.open(path).convert("RGBA")
+            logging.info(f"Loaded {path}")
+        except FileNotFoundError:
+            logging.error(f"Could not find icon file: {path}")
+        except Exception as e:
+            logging.error(f"Error loading {path}: {e}")
+    return icons
 
 
 class View:
