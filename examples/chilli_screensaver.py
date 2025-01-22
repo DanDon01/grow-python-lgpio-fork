@@ -15,7 +15,7 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
         with display_lock:
             image = Image.new("RGB", (width, height), (0, 0, 0))
             draw = ImageDraw.Draw(image)
-            image.paste(chilli_icon, (x, y), chilli_icon)
+            image.paste(chilli_icon, (x, y), mask=chilli_icon)
             display.display(image)
 
         x += dx
@@ -27,6 +27,10 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
             dy = -dy
 
         time.sleep(0.05)
+        
+def cleanup_display(display):
+    display.invert(False)  # Restore inversion setting
+    display.bgr(False)     # Restore color order        
 
 if __name__ == "__main__":
     # This part will be executed when the script is run directly
@@ -41,11 +45,12 @@ if __name__ == "__main__":
         dc=9,
         backlight=12,
         rotation=270,
-        spi_speed_hz=40000000,
-        invert=False,
+        spi_speed_hz=80000000,
+      #  invert=False,
       #  bgr=True
     )
     display.begin()
     draw_chilli_animation(display, icons, stop_event, display_lock)
+    
 
 

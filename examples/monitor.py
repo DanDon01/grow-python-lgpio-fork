@@ -25,11 +25,6 @@ from threading import Thread
 from threading import Event
 from threading import Lock
 
-# Set up the ST7735 SPI Display
-display = ST7735.ST7735(
-        port=0, cs=0, dc=9, backlight=12, rotation=270, spi_speed_hz=80000000
-)
-display.begin()
 
 screensaver_stop_event = Event()
 screensaver_thread = None
@@ -109,7 +104,7 @@ class View:
 
     def icon(self, icon, position, color):
         """Draw an icon on the display at the specified position."""
-        logging.info(f"Applying color overlay: {color}")
+        
         col = Image.new("RGBA", icon.size, color=color)
         self._image.paste(col, position, mask=icon)
         
@@ -1097,58 +1092,68 @@ def main():
     last_button_press = 0
     screensaver_active = False
 
-    def handle_button(chip, gpio, level, tick):
-        global last_button_press, screensaver_thread, screensaver_stop_event, screensaver_active
+def handle_button(chip, gpio, level, tick):
+    global last_button_press, screensaver_thread, screensaver_stop_event, screensaver_active
 
-        index = BUTTONS.index(gpio)
-        label = LABELS[index]
+    index = BUTTONS.index(gpio)
+    label = LABELS[index]
 
-        current_time = time.time()
-        # Debounce: Ignore presses within 0.3 seconds
-        if current_time - last_button_press < 0.3:
-            return
+    current_time = time.time()
+    # Debounce: Ignore presses within 0.3 seconds
+    if current_time - last_button_press < 0.3:
+        return
 
-        last_button_press = current_time  # Update last press time
-        print(f"Button pressed: {label}")  # Debug
+    last_button_press = current_time  # Update last press time
+    print(f"Button pressed: {label}")  # Debug
 
-        if label == "A":
-            viewcontroller.button_a()
+    if label == "A":
+        viewcontroller.button_a()
 
-        elif label == "B":
-            if not viewcontroller.button_b():
-                if viewcontroller.home:
-                    if alarm.sleeping():
-                        alarm.cancel_sleep()
-                    else:
-                        alarm.sleep()
+    elif label == "B":
+        if not viewcontroller.button_b():
+            if viewcontroller.home:
+                if alarm.sleeping():
+                    alarm.cancel_sleep()
+                else:
+                    alarm.sleep()
 
-        elif label == "X":
-            viewcontroller.button_x()
+    elif label == "X":
+        viewcontroller.button_x()
 
-        elif label == "Y":
-            if screensaver_active:
-                # Stop the screensaver
-                logging.info("Stopping screensaver...")
-                screensaver_stop_event.set()  # Signal the screensaver to stop
-                screensaver_thread.wait()  # Wait for it to finish
-                screensaver_thread = None
-                screensaver_active = False
-                # Ensure the display is updated after stopping the screensaver
-                with display_lock:
-                    viewcontroller.render()
-                    display.display(image.convert("RGB"))
-            else:
-                # Start the screensaver
-                logging.info("Starting screensaver...")
-                screensaver_stop_event.clear()  # Reset the stop event
-                screensaver_thread = subprocess.Popen([sys.executable, 'chilli_screensaver.py'])
-                screensaver_active = True
+    elif label == "Y":
+        if screensaver_active:
+            # Stop the screensaver
+            logging.info("Stopping screensaver...")
+            try:
+                screensaver_thread.terminate()  # Terminate the screensaver process
+                screensaver_thread.wait()       # Wait for the process to terminate
+            except Exception as e:
+                logging.error(f"Error stopping screensaver: {e}")
+            screensaver_thread = None
+            screensaver_active = False
+            # Ensure the display is updated after stopping the screensaver
+            with display_lock:
+                viewcontroller.render()
+                display.display(image.convert("RGB"))
+        else:
+            # Start the screensaver
+            logging.info("Starting screensaver...")
+            screensaver_stop_event.clear()  # Reset the stop event
+            screensaver_thread = subprocess.Popen([sys.executable, 'chilli_screensaver.py'])
+            screensaver_active = True
 
-    # Add signal handler for graceful shutdown
+    def cleanup():
+        global screensaver_thread
+        if screensaver_thread is not None:
+            screensaver_thread.terminate()
+            screensaver_thread.wait()
+            screensaver_thread = None
+
     import signal
 
     def signal_handler(signum, frame):
         print("\nShutting down gracefully...")
+        cleanup()  # Terminate the screensaver process
         try:
             GPIO.gpiochip_close(h)
         except:
