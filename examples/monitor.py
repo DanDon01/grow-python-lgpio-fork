@@ -1200,7 +1200,7 @@ def main():
             exit(1)
 
         # Clear display by drawing a blank image
-        blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(255, 255, 255))
+        blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
         with display_lock:
             display.display(blank_image)
         logging.info("Display cleared with blank image")
