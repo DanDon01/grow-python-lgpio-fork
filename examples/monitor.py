@@ -1213,7 +1213,7 @@ def handle_button(chip, gpio, level, tick):
         # Clear display by drawing a blank image
         blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
         with display_lock:
-            display.display(blank_image)
+             display.display(blank_image)
         logging.info("Display cleared with blank image")
 
         # Width and height already defined as constants
