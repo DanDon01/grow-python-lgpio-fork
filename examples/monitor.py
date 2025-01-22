@@ -1092,55 +1092,55 @@ def main():
     last_button_press = 0
     screensaver_active = False
 
-def handle_button(chip, gpio, level, tick):
-    global last_button_press, screensaver_thread, screensaver_stop_event, screensaver_active
+    def handle_button(chip, gpio, level, tick):
+        global last_button_press, screensaver_thread, screensaver_stop_event, screensaver_active
 
-    index = BUTTONS.index(gpio)
-    label = LABELS[index]
+        index = BUTTONS.index(gpio)
+        label = LABELS[index]
 
-    current_time = time.time()
-    # Debounce: Ignore presses within 0.3 seconds
-    if current_time - last_button_press < 0.3:
-        return
+        current_time = time.time()
+        # Debounce: Ignore presses within 0.3 seconds
+        if current_time - last_button_press < 0.3:
+            return
 
-    last_button_press = current_time  # Update last press time
-    print(f"Button pressed: {label}")  # Debug
+        last_button_press = current_time  # Update last press time
+        print(f"Button pressed: {label}")  # Debug
 
-    if label == "A":
-        viewcontroller.button_a()
+        if label == "A":
+            viewcontroller.button_a()
 
-    elif label == "B":
-        if not viewcontroller.button_b():
-            if viewcontroller.home:
-                if alarm.sleeping():
-                    alarm.cancel_sleep()
-                else:
-                    alarm.sleep()
+        elif label == "B":
+            if not viewcontroller.button_b():
+                if viewcontroller.home:
+                    if alarm.sleeping():
+                        alarm.cancel_sleep()
+                    else:
+                        alarm.sleep()
 
-    elif label == "X":
-        viewcontroller.button_x()
+        elif label == "X":
+            viewcontroller.button_x()
 
-    elif label == "Y":
-        if screensaver_active:
-            # Stop the screensaver
-            logging.info("Stopping screensaver...")
-            try:
-                screensaver_thread.terminate()  # Terminate the screensaver process
-                screensaver_thread.wait()       # Wait for the process to terminate
-            except Exception as e:
-                logging.error(f"Error stopping screensaver: {e}")
-            screensaver_thread = None
-            screensaver_active = False
-            # Ensure the display is updated after stopping the screensaver
-            with display_lock:
-                viewcontroller.render()
-                display.display(image.convert("RGB"))
-        else:
-            # Start the screensaver
-            logging.info("Starting screensaver...")
-            screensaver_stop_event.clear()  # Reset the stop event
-            screensaver_thread = subprocess.Popen([sys.executable, 'chilli_screensaver.py'])
-            screensaver_active = True
+        elif label == "Y":
+            if screensaver_active:
+                # Stop the screensaver
+                logging.info("Stopping screensaver...")
+                try:
+                    screensaver_thread.terminate()  # Terminate the screensaver process
+                    screensaver_thread.wait()       # Wait for the process to terminate
+                except Exception as e:
+                    logging.error(f"Error stopping screensaver: {e}")
+                screensaver_thread = None
+                screensaver_active = False
+                # Ensure the display is updated after stopping the screensaver
+                with display_lock:
+                    viewcontroller.render()
+                    display.display(image.convert("RGB"))
+            else:
+                # Start the screensaver
+                logging.info("Starting screensaver...")
+                screensaver_stop_event.clear()  # Reset the stop event
+                screensaver_thread = subprocess.Popen([sys.executable, 'chilli_screensaver.py'])
+                screensaver_active = True
 
     def cleanup():
         global screensaver_thread
@@ -1149,6 +1149,7 @@ def handle_button(chip, gpio, level, tick):
             screensaver_thread.wait()
             screensaver_thread = None
 
+    # Add signal handler for graceful shutdown
     import signal
 
     def signal_handler(signum, frame):
@@ -1159,7 +1160,7 @@ def handle_button(chip, gpio, level, tick):
         except:
             pass
         exit(0)
-    
+
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
@@ -1213,7 +1214,7 @@ def handle_button(chip, gpio, level, tick):
         # Clear display by drawing a blank image
         blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
         with display_lock:
-             display.display(blank_image)
+            display.display(blank_image)
         logging.info("Display cleared with blank image")
 
         # Width and height already defined as constants
@@ -1400,4 +1401,3 @@ if __name__ == "__main__":
         datefmt='%H:%M:%S'
     )
     main()
-
