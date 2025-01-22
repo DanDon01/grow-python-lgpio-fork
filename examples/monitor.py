@@ -417,8 +417,7 @@ class ChannelView(View):
         View.__init__(self, image)
 
     def draw_status(self, position):
-        status = f"{self.channel.sensor.moisture:.2f}Hz {self.channel.sensor.saturation * 100:.2f}%"
-
+        status = f"Sat: {self.channel.sensor.saturation * 100:.2f}%"
         self._draw.text(
             position,
             status,
@@ -427,11 +426,9 @@ class ChannelView(View):
         )
 
     def draw_context(self, position, metric="Hz"):
-        if metric.lower() == "hz":
-            context = f"Now: {self.channel.sensor.moisture:.2f}Hz"
-        else:  # metric == "sat"
+        context = f"Now: {self.channel.sensor.moisture:.2f}Hz"
+        if metric.lower() == "sat":
             context = f"Now: {self.channel.sensor.saturation * 100:.2f}%"
-
         self._draw.text(
             position,
             context,
@@ -448,8 +445,7 @@ class DetailView(ChannelView):
     """
 
     def render(self):
-        # Clear the display by drawing a black background
-        self._draw.rectangle((0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), fill=COLOR_BLACK)
+        self.clear()
 
         if self.channel.enabled:
             graph_height = DISPLAY_HEIGHT - 8 - 20
@@ -462,20 +458,19 @@ class DetailView(ChannelView):
             self.draw_status((graph_x, graph_y + graph_height + 4))
 
             # Draw the graph background
-            self._draw.rectangle((graph_x, graph_y, graph_x + graph_width, graph_y + graph_height), fill=(50, 50, 50))
+            self._draw.rectangle((graph_x, graph_y, graph_x + graph_width, graph_y + graph_height), (50, 50, 50))
 
             # Render the graph bars
             for x, value in enumerate(self.channel.sensor.history[:graph_width]):
                 color = self.channel.indicator_color(value)
                 h = value * graph_height
                 x = graph_x + graph_width - x - 1
-                self._draw.rectangle((x, graph_y + graph_height - h, x + 1, graph_y + graph_height), fill=color)
+                self._draw.rectangle((x, graph_y + graph_height - h, x + 1, graph_y + graph_height), color)
 
             # Draw the alarm line
             alarm_line = int(self.channel.warn_level * graph_height)
             r = 255
             if self.channel.alarm:
-                # Pulsate the red line if the alarm is active
                 r = int(((math.sin(time.time() * 3 * math.pi) + 1.0) / 2.0) * 128) + 127
 
             self._draw.rectangle(
@@ -485,7 +480,7 @@ class DetailView(ChannelView):
                     DISPLAY_WIDTH - 40,
                     graph_height + 8 - alarm_line,
                 ),
-                fill=(r, 0, 0),
+                (r, 0, 0),
             )
             self._draw.rectangle(
                 (
@@ -494,14 +489,14 @@ class DetailView(ChannelView):
                     DISPLAY_WIDTH,
                     graph_height + 8 - alarm_line,
                 ),
-                fill=(r, 0, 0),
+                (r, 0, 0),
             )
 
             # Render the alarm icon
             self.icon(
                 icon_alarm,
                 (DISPLAY_WIDTH - 40, graph_height + 8 - alarm_line - 10),
-                color=(r, 0, 0),
+                (r, 0, 0),
             )
 
         # Channel icons
