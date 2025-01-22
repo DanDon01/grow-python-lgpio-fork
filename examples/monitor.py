@@ -25,6 +25,12 @@ from threading import Thread
 from threading import Event
 from threading import Lock
 
+# Set up the ST7735 SPI Display
+display = ST7735.ST7735(
+        port=0, cs=1, dc=9, backlight=12, rotation=270, spi_speed_hz=80000000
+)
+display.begin()
+
 screensaver_stop_event = Event()
 screensaver_thread = None
 
@@ -1187,7 +1193,7 @@ def main():
             dc=9,            # GPIO 9  => Pin 21 (Data/Command)
             backlight=12,    # GPIO 12 => Pin 32
             rotation=270,
-            spi_speed_hz=10000000,
+            spi_speed_hz=80000000,
             bgr=False,
             invert=False
         )
