@@ -114,12 +114,12 @@ class View:
     def icon(self, icon, position, color=None):
         """Draw an icon on the display at the specified position."""
         if color:
-            # Apply color overlay if needed
-            colored_icon = Image.new("RGBA", icon.size, color=color)
-            self._image.paste(colored_icon, position, mask=icon)
+             logging.info(f"Applying color overlay: {color}")
+             colored_icon = Image.new("RGBA", icon.size, color=color)
+             self._image.paste(colored_icon, position, mask=icon)
         else:
-            # Directly paste the icon with its transparency
-            self._image.paste(icon, position, mask=icon)
+             logging.info("No color overlay applied")
+             self._image.paste(icon, position, mask=icon)
         
     def label(
         self,
