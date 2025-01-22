@@ -101,15 +101,11 @@ class View:
     def clear(self):
         self._draw.rectangle((0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), (0, 0, 0))
 
-    def icon(self, icon, position, color=None):
+    def icon(self, icon, position, color):
         """Draw an icon on the display at the specified position."""
-        if color:
-             logging.info(f"Applying color overlay: {color}")
-             colored_icon = Image.new("RGBA", icon.size, color=color)
-             self._image.paste(colored_icon, position, mask=icon)
-        else:
-             logging.info("No color overlay applied")
-             self._image.paste(icon, position, mask=icon)
+        logging.info(f"Applying color overlay: {color}")
+        col = Image.new("RGBA", icon.size, color=color)
+        self._image.paste(col, position, mask=icon)
         
     def label(
         self,
