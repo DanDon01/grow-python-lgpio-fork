@@ -1,3 +1,5 @@
+# This is version V2.0 of the code
+
 import time
 import lgpio as GPIO
 import logging
