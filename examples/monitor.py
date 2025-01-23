@@ -103,8 +103,7 @@ class View:
         pass
 
     def clear(self):
-        self._draw.rectangle((0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), fill=(0, 0, 0))  # Clear to black
-
+        self._draw.rectangle((0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), (0, 0, 0))
 
     def icon(self, icon, position, color):
         """Draw an icon on the display at the specified position."""
@@ -220,7 +219,7 @@ class MainView(View):
 
         View.__init__(self, image)
 
-    def render_channel(self, channel,):
+    def render_channel(self, channel):
         bar_x = 33
         bar_margin = 2
         bar_width = 30
@@ -266,26 +265,19 @@ class MainView(View):
         )
 
     def render(self):
-        logging.info("Starting render process...")
-        self.clear()  # Clear the frame first
-        logging.info("Frame cleared.")
-    
-        # Draw bars
+        self.clear()
+
         for channel in self.channels:
             self.render_channel(channel)
-            logging.info(f"Rendered channel {channel.channel}.")
-    
-        # Draw icons
-        self.icon(icon_backdrop, (0, 0), COLOR_WHITE)
-        logging.info("Backdrop icon rendered.")
-        self.icon(icon_rightarrow, (3, 3), (55, 55, 55))
-        logging.info("Right arrow icon rendered.")
-    
-        # Update the display
-        with display_lock:
-            display.display(self._image.convert("RGB"))
-            logging.info("Display updated.")
 
+        # Icons
+        self.icon(icon_backdrop, (0, 0), COLOR_WHITE)
+        self.icon(icon_rightarrow, (3, 3), (55, 55, 55))
+
+        self.alarm.render((3, DISPLAY_HEIGHT - 23))
+
+        self.icon(icon_backdrop.rotate(180), (DISPLAY_WIDTH - 26, 0), COLOR_WHITE)
+        self.icon(icon_settings, (DISPLAY_WIDTH - 19 - 3, 3), (55, 55, 55))
 
 
 class EditView(View):
@@ -1211,7 +1203,7 @@ def main():
             backlight=12,    # GPIO 12 => Pin 32
             rotation=270,
             spi_speed_hz=80000000,
-            bgr=True,
+            bgr=False,
             invert=True
         )
 
