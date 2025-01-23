@@ -102,7 +102,7 @@ class View:
         pass
 
     def clear(self):
-        self._draw.rectangle((0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), (255, 255, 255))
+        self._draw.rectangle((0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), (0, 0, 0))
 
     def icon(self, icon, position, color):
         """Draw an icon on the display at the specified position."""
