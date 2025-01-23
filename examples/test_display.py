@@ -27,10 +27,17 @@ image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(255, 255, 255))
 # Display the image
 display.display(image)
 
+COLOR_WHITE = (255, 255, 255)
+COLOR_BLUE = (31, 137, 251)
+COLOR_GREEN = (99, 255, 1)
+COLOR_YELLOW = (254, 219, 82)
+COLOR_RED = (247, 0, 63)
+COLOR_BLACK = (0, 0, 0)
+
 COLORS = [
-    ("Red", (255, 0, 0)),
-    ("Green", (0, 255, 0)),
-    ("Blue", (0, 0, 255)),
+    ("Red", (247, 0, 63)),
+    ("Green", (99, 255, 1)),
+    ("Blue", (31, 137, 251)),
 ]
 
 for name, color in COLORS:
