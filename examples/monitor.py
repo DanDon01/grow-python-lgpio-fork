@@ -1203,7 +1203,7 @@ def main():
             backlight=12,    # GPIO 12 => Pin 32
             rotation=270,
             spi_speed_hz=80000000,
-            bgr=False,
+            bgr=True,
             invert=True
         )
 
