@@ -1202,7 +1202,7 @@ def main():
         # Currently have spidev0.0 
         display = ST7735.ST7735(
             port=0,          # SPI0
-            cs=0,            # CE1 => GPIO 7 => Pin 26
+            cs=0,            # CE0 => GPIO 7 => Pin 26
             dc=9,            # GPIO 9  => Pin 21 (Data/Command)
             backlight=12,    # GPIO 12 => Pin 32
             rotation=270,
@@ -1223,10 +1223,6 @@ def main():
         with display_lock:
             display.display(blank_image)
         logging.info("Display cleared with blank image")
-
-        # Width and height already defined as constants
-        # DISPLAY_WIDTH = 160
-        # DISPLAY_HEIGHT = 80
 
         # Set up light sensor
         light = ltr559.LTR559()

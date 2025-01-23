@@ -1,18 +1,18 @@
 channel1:
-        enabled: true
-        warn_level: 0.2
+        enabled: false
+        warn_level: 0.5
         icon: icons/flat-4.png
         wet_point: 2.5
         dry_point: 27.6
 channel2:
         enabled: false
-        warn_level: 0.2
+        warn_level: 0.5
         wet_point: 2.5
         dry_point: 27.6
 channel3:
         enabled: false
-        warn_level: 0.2
-        wet_point: 2.5
+        warn_level: 0.5
+        wet_point: 2.2
         dry_point: 27.6
 general:
         alarm_enable: True

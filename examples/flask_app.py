@@ -1,9 +1,12 @@
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, request
+from flask_cors import CORS
 import logging
 from lgpio_moisture import Moisture
 from lgpio_pump import Pump
+from datetime import datetime, timezone
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 logging.basicConfig(level=logging.INFO)
 
 # Initialize moisture sensors and pumps
@@ -27,32 +30,42 @@ for i in range(3):
         logging.error(f"Failed to initialize Pump {i + 1}: {e}")
         pumps.append(None)
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+# Simulated last watered times and ambient light
+last_watered = [datetime.now(timezone.utc) for _ in range(3)]
+ambient_light = 500  # Example value, replace with actual sensor reading if available
 
-@app.route('/sensors', methods=['GET'])
-def get_sensors():
+@app.route('/sensor-data', methods=['GET'])
+def get_sensor_data():
+    plants = []
+    for i in range(3):
+        moisture = sensors[i].moisture if sensors[i] else 0
+        plants.append({
+            "id": i + 1,
+            "name": f"Plant {i + 1}",
+            "soilMoisture": moisture,
+            "lastWatered": last_watered[i].isoformat()
+        })
+    
     data = {
-        "sensor1": sensors[0].moisture if sensors[0] else "Error",
-        "sensor2": sensors[1].moisture if sensors[1] else "Error",
-        "sensor3": sensors[2].moisture if sensors[2] else "Error",
+        "plants": plants,
+        "ambientLight": ambient_light  # Add actual ambient light sensor reading here if available
     }
     return jsonify(data)
+
+@app.route('/water-plant/<int:plant_id>', methods=['POST'])
+def water_plant(plant_id):
+    if 1 <= plant_id <= 3 and pumps[plant_id - 1]:
+        pumps[plant_id - 1].run()
+        last_watered[plant_id - 1] = datetime.now(timezone.utc)
+        return jsonify({"success": True, "message": f"Watered plant {plant_id}"})
+    else:
+        return jsonify({"success": False, "message": "Invalid plant ID or pump not initialized"}), 400
 
 @app.route('/logs', methods=['GET'])
 def get_logs():
     with open('app.log', 'r') as log_file:
         logs = log_file.readlines()
     return jsonify(logs)
-
-@app.route('/pump/<int:pump_id>', methods=['POST'])
-def run_pump(pump_id):
-    if 1 <= pump_id <= 3 and pumps[pump_id - 1]:
-        pumps[pump_id - 1].run()
-        return jsonify({"status": "success", "message": f"Pump {pump_id} activated"})
-    else:
-        return jsonify({"status": "error", "message": "Invalid pump ID or pump not initialized"}), 400
 
 if __name__ == '__main__':
     logging.info("Starting Flask app...")
