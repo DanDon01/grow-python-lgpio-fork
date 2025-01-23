@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# In the version of the code, the display is not showing the correct colours for anything.
+
 import logging
 import math
 import pathlib
