@@ -38,7 +38,10 @@ COLORS = [
     ("Red", (247, 0, 63)),
     ("Green", (99, 255, 1)),
     ("Blue", (31, 137, 251)),
-]
+    ("Black", (0, 0, 0)),
+    ("White", (255, 255, 255)),
+    ("Yellow", (254, 219, 82))
+
 
 for name, color in COLORS:
     print(f"Testing {name} color...")
