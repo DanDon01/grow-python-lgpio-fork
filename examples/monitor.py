@@ -103,7 +103,8 @@ class View:
         pass
 
     def clear(self):
-        self._draw.rectangle((0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), (0, 0, 0))
+        self._draw.rectangle((0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT), fill=(0, 0, 0))  # Clear to black
+
 
     def icon(self, icon, position, color):
         """Draw an icon on the display at the specified position."""
@@ -219,7 +220,7 @@ class MainView(View):
 
         View.__init__(self, image)
 
-    def render_channel(self, channel):
+    def render_channel(self, channel,):
         bar_x = 33
         bar_margin = 2
         bar_width = 30
@@ -265,19 +266,26 @@ class MainView(View):
         )
 
     def render(self):
-        self.clear()
-
+        logging.info("Starting render process...")
+        self.clear()  # Clear the frame first
+        logging.info("Frame cleared.")
+    
+        # Draw bars
         for channel in self.channels:
             self.render_channel(channel)
-
-        # Icons
+            logging.info(f"Rendered channel {channel.channel}.")
+    
+        # Draw icons
         self.icon(icon_backdrop, (0, 0), COLOR_WHITE)
+        logging.info("Backdrop icon rendered.")
         self.icon(icon_rightarrow, (3, 3), (55, 55, 55))
+        logging.info("Right arrow icon rendered.")
+    
+        # Update the display
+        with display_lock:
+            display.display(self._image.convert("RGB"))
+            logging.info("Display updated.")
 
-        self.alarm.render((3, DISPLAY_HEIGHT - 23))
-
-        self.icon(icon_backdrop.rotate(180), (DISPLAY_WIDTH - 26, 0), COLOR_WHITE)
-        self.icon(icon_settings, (DISPLAY_WIDTH - 19 - 3, 3), (55, 55, 55))
 
 
 class EditView(View):
@@ -1191,38 +1199,29 @@ def main():
 
     try:
         # Set up the ST7735 SPI Display for CE1 on GPIO 7
-        # Run: ls /dev/spidev0.*
-        # See if you have /dev/spidev0.0 or /dev/spidev0.1 (or both).
-        # If you only see spidev0.0, you need cs=0 in Python.
-        # If you only see spidev0.1, you need cs=1 in Python.
-        # Currently have spidev0.0 
-        display = ST7735.ST7735(
-            port=0,          # SPI0
-            cs=0,            # CE1 => GPIO 7 => Pin 26
-            dc=9,            # GPIO 9  => Pin 21 (Data/Command)
-            backlight=12,    # GPIO 12 => Pin 32
-            rotation=270,
-            spi_speed_hz=80000000,
-            bgr=True,
-            invert=True
-        )
+        with display_lock:  # Lock the display during initialization
+            display = ST7735.ST7735(
+                port=0,          # SPI0
+                cs=0,            # CE1 => GPIO 7 => Pin 26
+                dc=9,            # GPIO 9  => Pin 21 (Data/Command)
+                backlight=12,    # GPIO 12 => Pin 32
+                rotation=270,
+                spi_speed_hz=80000000,
+                bgr=True,
+                invert=True
+            )
 
-        try:
-            display.begin()
-            logging.info("Display initialized successfully on CE1")
-        except Exception as e:
-            logging.error(f"Failed to initialise display on CE1: {e}")
-            exit(1)
+            try:
+                display.begin()
+                logging.info("Display initialized successfully on CE1")
+            except Exception as e:
+                logging.error(f"Failed to initialise display on CE1: {e}")
+                exit(1)
 
-        # Clear display by drawing a blank image
-        blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
-        with display_lock:
+            # Clear display by drawing a blank image
+            blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
             display.display(blank_image)
-        logging.info("Display cleared with blank image")
-
-        # Width and height already defined as constants
-        # DISPLAY_WIDTH = 160
-        # DISPLAY_HEIGHT = 80
+            logging.info("Display cleared with blank image")
 
         # Set up light sensor
         light = ltr559.LTR559()
@@ -1252,13 +1251,11 @@ def main():
         channels = []
         for i in range(3):
             try:
-                # Add longer delay between channel attempts
-                time.sleep(0.5)
+                time.sleep(0.5)  # Add longer delay between channel attempts
                 
                 channel = Channel(i+1, i+1, i+1, gpio_handle=h)
                 channel.initialize()
                 
-                # Only add if both sensor and pump initialized successfully
                 if channel.sensor is not None and channel.sensor.active:
                     channels.append(channel)
                     logging.info(f"Successfully initialized channel {i+1}")
@@ -1268,7 +1265,6 @@ def main():
             except Exception as e:
                 logging.error(f"Failed to initialize channel {i+1}: {e}")
         
-        # Verify we have at least one working channel
         if not channels:
             logging.error("No channels could be initialized")
             return
@@ -1288,67 +1284,29 @@ def main():
 
         alarm.update_from_yml(config.get_general())
 
-        print("Channels:")
-        for channel in channels:
-            print(channel)
-
-        print(
-            """Settings:
-    Alarm Enabled: {}
-    Alarm Interval: {:.2f}s
-    Low Light Set Screen To Black: {}
-    Low Light Value {:.2f}
-    """.format(
-                alarm.enabled,
-                alarm.interval,
-                config.get_general().get("black_screen_when_light_low"),
-                config.get_general().get("light_level_low")
-            )
-        )
-
         main_options = [
-            {
-                "title": "Alarm Interval",
-                "prop": "interval",
-                "inc": 1,
-                "min": 1,
-                "max": 60,
-                "format": lambda value: f"{value:02.0f}sec",
-                "object": alarm,
-                "help": "Time between alarm beeps.",
-            },
-            {
-                "title": "Alarm Enable",
-                "prop": "enabled",
-                "mode": "bool",
-                "format": lambda value: "Yes" if value else "No",
-                "object": alarm,
-                "help": "Enable the piezo alarm beep.",
-            },
+            {"title": "Alarm Interval", "prop": "interval", "inc": 1, "min": 1, "max": 60,
+             "format": lambda value: f"{value:02.0f}sec", "object": alarm, "help": "Time between alarm beeps."},
+            {"title": "Alarm Enable", "prop": "enabled", "mode": "bool",
+             "format": lambda value: "Yes" if value else "No", "object": alarm, "help": "Enable the piezo alarm beep."},
         ]
 
-        # Modify viewcontroller initialization to handle missing channels
         views = [(MainView(image, channels=channels, alarm=alarm),
-                 SettingsView(image, options=main_options))]
+                  SettingsView(image, options=main_options))]
                  
         for channel in channels:
-            views.append((
-                DetailView(image, channel=channel),
-                ChannelEditView(image, channel=channel)
-            ))
+            views.append((DetailView(image, channel=channel), ChannelEditView(image, channel=channel)))
 
         viewcontroller = ViewController(views)
 
         while True:
             try:
-                # Update channels
                 for channel in channels:
                     if channel and channel.sensor and channel.sensor.active:
                         channel.update()
                         if channel.alarm:
                             alarm.trigger()
 
-                # Write sensor data to file every cycle
                 write_sensor_data(channels)
 
                 light_level_low = light.get_lux() < config.get_general().get("light_level_low")
@@ -1359,7 +1317,6 @@ def main():
 
                 with display_lock:
                     if screensaver_active:
-                        # Skip rendering if screensaver is active
                         continue
 
                     if light_level_low and config.get_general().get("black_screen_when_light_low"):
@@ -1371,19 +1328,15 @@ def main():
                         display.display(image.convert("RGB"))
 
                 config.set_general(
-                    {
-                        "alarm_enable": alarm.enabled,
-                        "alarm_interval": alarm.interval,
-                    }
-                )
+                    {"alarm_enable": alarm.enabled, "alarm_interval": alarm.interval})
 
                 config.save()
 
-                time.sleep(1.0 / FPS)  # Slower updates
+                time.sleep(1.0 / FPS)
                 
             except Exception as e:
                 logging.error(f"Error in main loop: {e}")
-                time.sleep(1)  # Prevent tight error loop
+                time.sleep(1)
 
     except KeyboardInterrupt:
         print("\nExiting...")
@@ -1392,15 +1345,10 @@ def main():
     finally:
         print("Cleaning up...")
         try:
-            GPIO.gpiochip_close(h)  # Also fix the variable name to h instead of gpio_handle
+            GPIO.gpiochip_close(h)
         except:
             pass
 
 if __name__ == "__main__":
-    # Change logging level to INFO - this will hide DEBUG messages
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%H:%M:%S'
-    )
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S')
     main()
