@@ -1097,66 +1097,318 @@ def draw_chilli_animation(display, icons, stop_event):
 def main():
     global screensaver_thread, screensaver_stop_event, last_button_press, screensaver_active
 
+    # Global variables
     screensaver_thread = None
-    screensaver_stop_event = Event()
+    screensaver_stop_event = Event()  # Event for stopping the screensaver
     last_button_press = 0
     screensaver_active = False
 
     def handle_button(chip, gpio, level, tick):
-        global last_button_press, screensaver_active
+        global last_button_press, screensaver_thread, screensaver_stop_event, screensaver_active
+
+        index = BUTTONS.index(gpio)
+        label = LABELS[index]
+
         current_time = time.time()
+        # Debounce: Ignore presses within 0.3 seconds
         if current_time - last_button_press < 0.3:
             return
-        last_button_press = current_time
-        if screensaver_active:
-            with display_lock:
-                screensaver_stop_event.set()
-            screensaver_active = False
+
+        last_button_press = current_time  # Update last press time
+        print(f"Button pressed: {label}")  # Debug
+
+        if label == "A":
+            viewcontroller.button_a()
+
+        elif label == "B":
+            if not viewcontroller.button_b():
+                if viewcontroller.home:
+                    if alarm.sleeping():
+                        alarm.cancel_sleep()
+                    else:
+                        alarm.sleep()
+
+        elif label == "X":
+            viewcontroller.button_x()
+
+        elif label == "Y":
+            if screensaver_active:
+                # Stop the screensaver
+                logging.info("Stopping screensaver...")
+                try:
+                    screensaver_thread.terminate()  # Terminate the screensaver process
+                    screensaver_thread.wait()       # Wait for the process to terminate
+                except Exception as e:
+                    logging.error(f"Error stopping screensaver: {e}")
+                screensaver_thread = None
+                screensaver_active = False
+                # Ensure the display is updated after stopping the screensaver
+                with display_lock:
+                    viewcontroller.render()
+                    display.display(image.convert("RGB"))
+            else:
+                # Start the screensaver
+                logging.info("Starting screensaver...")
+                screensaver_stop_event.clear()  # Reset the stop event
+                screensaver_thread = subprocess.Popen([sys.executable, 'chilli_screensaver.py'])
+                screensaver_active = True
 
     def cleanup():
         global screensaver_thread
-        if screensaver_thread:
+        if screensaver_thread is not None:
             screensaver_thread.terminate()
+            screensaver_thread.wait()
             screensaver_thread = None
 
+    # Add signal handler for graceful shutdown
+    import signal
+
+    def signal_handler(signum, frame):
+        print("\nShutting down gracefully...")
+        cleanup()  # Terminate the screensaver process
+        try:
+            GPIO.gpiochip_close(h)
+        except:
+            pass
+        exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    # Moved icon loading to beginning of main()
     icons = load_icons()
-    if not icons:
-        logging.error("Failed to load icons")
+    if icons is None:
+        print("Could not load required icons. Please ensure icons/ directory exists with required files.")
         return
+        
+    # Make icons available to all classes that need them
+    global icon_drop, icon_nodrop, icon_rightarrow, icon_alarm, icon_snooze
+    global icon_help, icon_settings, icon_channel, icon_backdrop, icon_return, icon_chilli
+    
+    icon_drop = icons['drop']
+    icon_nodrop = icons['nodrop']
+    icon_rightarrow = icons['rightarrow']
+    icon_alarm = icons['alarm']
+    icon_snooze = icons['snooze']
+    icon_help = icons['help']
+    icon_settings = icons['settings']
+    icon_channel = icons['channel']
+    icon_backdrop = icons['backdrop']
+    icon_return = icons['return']
+    icon_chilli = icons['chilli']
 
     try:
-        with display_lock:
-            display = ST7735.ST7735(
-                port=0,
-                cs=0,
-                dc=9,
-                backlight=12,
-                rotation=270,
-                spi_speed_hz=80000000,
-                bgr=True,
-                invert=True
-            )
-            display.begin()
-            logging.info("Display initialized.")
-            blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), (0, 0, 0))
-            display.display(blank_image)
+        # Set up the ST7735 SPI Display for CE1 on GPIO 7
+        # Run: ls /dev/spidev0.*
+        # See if you have /dev/spidev0.0 or /dev/spidev0.1 (or both).
+        # If you only see spidev0.0, you need cs=0 in Python.
+        # If you only see spidev0.1, you need cs=1 in Python.
+        # Currently have spidev0.0 
+        display = ST7735.ST7735(
+            port=0,          # SPI0
+            cs=0,            # CE1 => GPIO 7 => Pin 26
+            dc=9,            # GPIO 9  => Pin 21 (Data/Command)
+            backlight=12,    # GPIO 12 => Pin 32
+            rotation=270,
+            spi_speed_hz=80000000,
+            bgr=True,
+            invert=True
+        )
 
-        image = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), (255, 255, 255))
-        h = GPIO.gpiochip_open(0)
-        GPIO.gpio_claim_input(h, BUTTONS[0], GPIO.SET_PULL_UP)
-        GPIO.callback(h, BUTTONS[0], GPIO.FALLING_EDGE, handle_button)
+        try:
+            display.begin()
+            logging.info("Display initialized successfully on CE1")
+        except Exception as e:
+            logging.error(f"Failed to initialise display on CE1: {e}")
+            exit(1)
+
+        # Clear display by drawing a blank image
+        blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
+        with display_lock:
+            display.display(blank_image)
+        logging.info("Display cleared with blank image")
+
+        # Width and height already defined as constants
+        # DISPLAY_WIDTH = 160
+        # DISPLAY_HEIGHT = 80
+
+        # Set up light sensor
+        light = ltr559.LTR559()
+        logging.info("Light sensor initialized")
+
+        # Set up our canvas and prepare for drawing
+        image = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(255, 255, 255))
+        image_blank = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
+        logging.info("Canvas prepared for drawing")
+
+        # Clean up GPIO and initialize
+        h = GPIO.gpiochip_open(0)  # Store the handle
+        logging.info("GPIO handle opened successfully")
+        
+        # Set up button handlers
+        for pin in BUTTONS:
+            try:
+                GPIO.gpio_claim_input(h, pin, GPIO.SET_PULL_UP)
+                GPIO.gpio_claim_alert(h, pin, GPIO.FALLING_EDGE, GPIO.SET_PULL_UP)
+                GPIO.callback(h, pin, GPIO.FALLING_EDGE, handle_button)
+                time.sleep(0.1)
+                logging.info(f"Button {pin} initialized successfully")
+            except Exception as e:
+                logging.warning(f"Failed to initialize button {pin}: {e}")
+
+        # Initialize channels with more careful error handling and delays
+        channels = []
+        for i in range(3):
+            try:
+                # Add longer delay between channel attempts
+                time.sleep(0.5)
+                
+                channel = Channel(i+1, i+1, i+1, gpio_handle=h)
+                channel.initialize()
+                
+                # Only add if both sensor and pump initialized successfully
+                if channel.sensor is not None and channel.sensor.active:
+                    channels.append(channel)
+                    logging.info(f"Successfully initialized channel {i+1}")
+                else:
+                    logging.error(f"Channel {i+1} sensor initialization failed")
+                    
+            except Exception as e:
+                logging.error(f"Failed to initialize channel {i+1}: {e}")
+        
+        # Verify we have at least one working channel
+        if not channels:
+            logging.error("No channels could be initialized")
+            return
+
+        alarm = Alarm(image)
+        config = Config()
+
+        try:
+            config.load()
+            logging.info("Configuration loaded successfully")
+        except Exception as e:
+            logging.error(f"Failed to load configuration: {e}")
+            return
+
+        for channel in channels:
+            channel.update_from_yml(config.get_channel(channel.channel))
+
+        alarm.update_from_yml(config.get_general())
+
+        print("Channels:")
+        for channel in channels:
+            print(channel)
+
+        print(
+            """Settings:
+    Alarm Enabled: {}
+    Alarm Interval: {:.2f}s
+    Low Light Set Screen To Black: {}
+    Low Light Value {:.2f}
+    """.format(
+                alarm.enabled,
+                alarm.interval,
+                config.get_general().get("black_screen_when_light_low"),
+                config.get_general().get("light_level_low")
+            )
+        )
+
+        main_options = [
+            {
+                "title": "Alarm Interval",
+                "prop": "interval",
+                "inc": 1,
+                "min": 1,
+                "max": 60,
+                "format": lambda value: f"{value:02.0f}sec",
+                "object": alarm,
+                "help": "Time between alarm beeps.",
+            },
+            {
+                "title": "Alarm Enable",
+                "prop": "enabled",
+                "mode": "bool",
+                "format": lambda value: "Yes" if value else "No",
+                "object": alarm,
+                "help": "Enable the piezo alarm beep.",
+            },
+        ]
+
+        # Modify viewcontroller initialization to handle missing channels
+        views = [(MainView(image, channels=channels, alarm=alarm),
+                 SettingsView(image, options=main_options))]
+                 
+        for channel in channels:
+            views.append((
+                DetailView(image, channel=channel),
+                ChannelEditView(image, channel=channel)
+            ))
+
+        viewcontroller = ViewController(views)
 
         while True:
-            with display_lock:
-                # Render test frame for debugging
-                test_frame = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), (0, 255, 0))
-                display.display(test_frame)
-                logging.info("Test frame displayed.")
-            time.sleep(1)
+            try:
+                # Update channels
+                for channel in channels:
+                    if channel and channel.sensor and channel.sensor.active:
+                        channel.update()
+                        if channel.alarm:
+                            alarm.trigger()
 
+                # Write sensor data to file every cycle
+                write_sensor_data(channels)
+
+                light_level_low = light.get_lux() < config.get_general().get("light_level_low")
+
+                alarm.update(light_level_low)
+
+                viewcontroller.update()
+
+                with display_lock:
+                    if screensaver_active:
+                        # Skip rendering if screensaver is active
+                        continue
+
+                    if light_level_low and config.get_general().get("black_screen_when_light_low"):
+                        display.sleep()
+                        display.display(image_blank.convert("RGB"))
+                    else:
+                        viewcontroller.render()
+                        display.wake()
+                        display.display(image.convert("RGB"))
+
+                config.set_general(
+                    {
+                        "alarm_enable": alarm.enabled,
+                        "alarm_interval": alarm.interval,
+                    }
+                )
+
+                config.save()
+
+                time.sleep(1.0 / FPS)  # Slower updates
+                
+            except Exception as e:
+                logging.error(f"Error in main loop: {e}")
+                time.sleep(1)  # Prevent tight error loop
+
+    except KeyboardInterrupt:
+        print("\nExiting...")
     except Exception as e:
-        logging.error(f"Error in main: {e}")
+        logging.error(f"Fatal error: {e}")
     finally:
-        cleanup()
-        GPIO.gpiochip_close(h)
+        print("Cleaning up...")
+        try:
+            GPIO.gpiochip_close(h)  # Also fix the variable name to h instead of gpio_handle
+        except:
+            pass
 
+if __name__ == "__main__":
+    # Change logging level to INFO - this will hide DEBUG messages
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%H:%M:%S'
+    )
+    main()
