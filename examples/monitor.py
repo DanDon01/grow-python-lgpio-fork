@@ -1234,7 +1234,7 @@ def main():
         
 
         # Set up our canvas and prepare for drawing
-        image = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(255, 255, 255))
+        image = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
         image_blank = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
         logging.info("Canvas prepared for drawing")
 
