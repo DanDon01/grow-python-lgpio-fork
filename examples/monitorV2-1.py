@@ -1,8 +1,6 @@
 import time
 import lgpio as GPIO
 import logging
-from flask import Flask, jsonify
-from threading import Thread
 from PIL import Image, ImageDraw, ImageFont
 import ST7735
 
@@ -10,7 +8,6 @@ import ST7735
 MOISTURE_1_PIN = 23  # GPIO 23 (Pin 16) - Moisture 1
 MOISTURE_2_PIN = 8   # GPIO 8  (Pin 24) - Moisture 2
 MOISTURE_3_PIN = 25  # GPIO 25 (Pin 22) - Moisture 3
-MOISTURE_INT_PIN = 4  # GPIO 4  (Pin 7)  - Moisture Int
 
 # Button pins and labels
 BUTTONS = [5, 6, 16, 24]  # GPIO pins for buttons A, B, X, Y
@@ -34,21 +31,15 @@ display.begin()
 # Font for the display
 font = ImageFont.truetype("fonts/Roboto-Medium.ttf", 14)
 
-# Flask app setup
-app = Flask(__name__)
-
 # Global variables for sensor data
 sensor_data = {
-    'timestamp': None,
-    'sensors': {
-        'channel1': {'moisture': 0, 'saturation': 0, 'alarm': False, 'enabled': True, 'history': []},
-        'channel2': {'moisture': 0, 'saturation': 0, 'alarm': False, 'enabled': True, 'history': []},
-        'channel3': {'moisture': 0, 'saturation': 0, 'alarm': False, 'enabled': True, 'history': []},
-    }
+    'channel1': {'moisture': 0, 'saturation': 0, 'enabled': True},
+    'channel2': {'moisture': 0, 'saturation': 0, 'enabled': True},
+    'channel3': {'moisture': 0, 'saturation': 0, 'enabled': True},
 }
 
 class Moisture:
-    def __init__(self, channel, gpio_handle=None):
+    def __init__(self, channel, gpio_handle):
         """Create a new moisture sensor instance for a specific channel (1-3)."""
         self._gpio_pin = [MOISTURE_1_PIN, MOISTURE_2_PIN, MOISTURE_3_PIN][channel - 1]
         self._history = []
@@ -56,8 +47,7 @@ class Moisture:
         self._last_edge = None
         self._wet_point = 0.7
         self._dry_point = 26.7
-        self._h = gpio_handle if gpio_handle is not None else GPIO.gpiochip_open(0)
-        self._owns_handle = gpio_handle is None
+        self._h = gpio_handle
         self.active = True
         
         logging.info(f"Initializing Moisture sensor {channel} on GPIO {self._gpio_pin}")
@@ -107,19 +97,6 @@ class Moisture:
         
         self._last_edge = current_time
 
-    def set_wet_point(self, freq):
-        """Set the frequency for 100% saturation."""
-        self._wet_point = freq
-
-    def set_dry_point(self, freq):
-        """Set the frequency for 0% saturation."""
-        self._dry_point = freq
-
-    @property
-    def history(self):
-        """Return history of saturation readings."""
-        return self._history
-
     @property
     def moisture(self):
         """Return the current moisture frequency in Hz."""
@@ -138,14 +115,6 @@ class Moisture:
         moisture = (moisture - zero) / span
         return max(0.0, min(1.0, moisture))
 
-    def __del__(self):
-        """Clean up GPIO resources."""
-        try:
-            if self._owns_handle:
-                GPIO.gpiochip_close(self._h)
-        except:
-            pass
-
 def handle_button(chip, gpio, level, timestamp):
     """Handle button presses."""
     index = BUTTONS.index(gpio)
@@ -155,16 +124,16 @@ def handle_button(chip, gpio, level, timestamp):
     # Example button actions
     if label == "A":
         logging.info("Button A: Toggle Channel 1")
-        sensor_data['sensors']['channel1']['enabled'] = not sensor_data['sensors']['channel1']['enabled']
+        sensor_data['channel1']['enabled'] = not sensor_data['channel1']['enabled']
     elif label == "B":
         logging.info("Button B: Toggle Channel 2")
-        sensor_data['sensors']['channel2']['enabled'] = not sensor_data['sensors']['channel2']['enabled']
+        sensor_data['channel2']['enabled'] = not sensor_data['channel2']['enabled']
     elif label == "X":
         logging.info("Button X: Toggle Channel 3")
-        sensor_data['sensors']['channel3']['enabled'] = not sensor_data['sensors']['channel3']['enabled']
+        sensor_data['channel3']['enabled'] = not sensor_data['channel3']['enabled']
     elif label == "Y":
         logging.info("Button Y: Reset all channels")
-        for channel in sensor_data['sensors'].values():
+        for channel in sensor_data.values():
             channel['enabled'] = True
 
 def setup_buttons(gpio_handle):
@@ -186,35 +155,12 @@ def update_display():
         draw = ImageDraw.Draw(image)
 
         # Draw sensor data on the display
-        draw.text((10, 10), f"Ch1: {sensor_data['sensors']['channel1']['moisture']:.2f} Hz", font=font, fill=(255, 255, 255))
-        draw.text((10, 30), f"Ch2: {sensor_data['sensors']['channel2']['moisture']:.2f} Hz", font=font, fill=(255, 255, 255))
-        draw.text((10, 50), f"Ch3: {sensor_data['sensors']['channel3']['moisture']:.2f} Hz", font=font, fill=(255, 255, 255))
+        draw.text((10, 10), f"Ch1: {sensor_data['channel1']['moisture']:.2f} Hz", font=font, fill=(255, 255, 255))
+        draw.text((10, 30), f"Ch2: {sensor_data['channel2']['moisture']:.2f} Hz", font=font, fill=(255, 255, 255))
+        draw.text((10, 50), f"Ch3: {sensor_data['channel3']['moisture']:.2f} Hz", font=font, fill=(255, 255, 255))
 
         # Display the image
         display.display(image)
-        time.sleep(1.0)
-
-@app.route('/sensor_data', methods=['GET'])
-def get_sensor_data():
-    """Flask endpoint to return sensor data."""
-    return jsonify(sensor_data)
-
-def update_sensor_data(m1, m2, m3):
-    """Update global sensor data with current readings."""
-    while True:
-        sensor_data['timestamp'] = time.strftime("%Y-%m-%d %H:%M:%S")
-        sensor_data['sensors']['channel1']['moisture'] = m1.moisture
-        sensor_data['sensors']['channel1']['saturation'] = m1.saturation * 100
-        sensor_data['sensors']['channel1']['history'] = m1.history
-
-        sensor_data['sensors']['channel2']['moisture'] = m2.moisture
-        sensor_data['sensors']['channel2']['saturation'] = m2.saturation * 100
-        sensor_data['sensors']['channel2']['history'] = m2.history
-
-        sensor_data['sensors']['channel3']['moisture'] = m3.moisture
-        sensor_data['sensors']['channel3']['saturation'] = m3.saturation * 100
-        sensor_data['sensors']['channel3']['history'] = m3.history
-
         time.sleep(1.0)
 
 def main():
@@ -229,18 +175,28 @@ def main():
     # Set up button handlers
     setup_buttons(gpio_handle)
 
-    # Start a thread to update sensor data
-    sensor_thread = Thread(target=update_sensor_data, args=(m1, m2, m3))
-    sensor_thread.daemon = True
-    sensor_thread.start()
-
     # Start a thread to update the display
     display_thread = Thread(target=update_display)
     display_thread.daemon = True
     display_thread.start()
 
-    # Start Flask app
-    app.run(host='0.0.0.0', port=5000)
+    # Main loop to update sensor data
+    try:
+        while True:
+            sensor_data['channel1']['moisture'] = m1.moisture
+            sensor_data['channel1']['saturation'] = m1.saturation * 100
+
+            sensor_data['channel2']['moisture'] = m2.moisture
+            sensor_data['channel2']['saturation'] = m2.saturation * 100
+
+            sensor_data['channel3']['moisture'] = m3.moisture
+            sensor_data['channel3']['saturation'] = m3.saturation * 100
+
+            time.sleep(1.0)
+    except KeyboardInterrupt:
+        print("\nExiting...")
+    finally:
+        GPIO.gpiochip_close(gpio_handle)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
