@@ -50,8 +50,22 @@
         .pump-buttons button:hover {
             background-color: #45a049;
         }
+        .chart-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .alarm-indicator {
+            color: red;
+            font-size: 20px;
+        }
     </style>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
     <script>
         function updateData() {
             fetch('/sensors')
@@ -116,7 +130,8 @@
             <button onclick="runPump(3)">Run Pump 3</button>
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <div id="charts-container"></div>
+    <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
     <script>
         async function fetchSensorData() {
             const response = await fetch('/sensors');
