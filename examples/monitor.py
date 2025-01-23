@@ -1048,11 +1048,15 @@ class Config:
         self.set("general", settings)
 
 
-def write_sensor_data(channels):
+def write_sensor_data(channels, light):
     """Write current sensor data to JSON file for Flask app"""
     data = {
         'timestamp': datetime.now().isoformat(),
-        'sensors': {}
+        'sensors': {},
+        'light': {
+            'lux': light.get_lux(),
+            'proximity': light.get_proximity()
+        }
     }
     
     for channel in channels:
@@ -1070,6 +1074,7 @@ def write_sensor_data(channels):
             json.dump(data, f)
     except Exception as e:
         logging.error(f"Failed to write sensor data: {e}")
+
 
 def draw_chilli_animation(display, icons, stop_event):
     """Draw chilli animation on the display."""
@@ -1226,10 +1231,7 @@ def main():
         # Set up light sensor
         light = ltr559.LTR559()
         logging.info("Light sensor initialized")
-        while True:
-            ltr559.update_sensor()
-            lux = ltr559.get_lux()
-            prox = ltr559.get_proximity()
+        
 
         # Set up our canvas and prepare for drawing
         image = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(255, 255, 255))
@@ -1352,7 +1354,7 @@ def main():
                             alarm.trigger()
 
                 # Write sensor data to file every cycle
-                write_sensor_data(channels)
+                write_sensor_data(channels, light)
 
                 light_level_low = light.get_lux() < config.get_general().get("light_level_low")
 
@@ -1403,6 +1405,7 @@ if __name__ == "__main__":
     # Change logging level to INFO - this will hide DEBUG messages
     logging.basicConfig(
         level=logging.INFO,
+
         format='%(asctime)s - %(levelname)s - %(message)s',
         datefmt='%H:%M:%S'
     )
