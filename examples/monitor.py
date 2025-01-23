@@ -1204,7 +1204,7 @@ def main():
             rotation=270,
             spi_speed_hz=80000000,
             bgr=False,
-            invert=True
+            invert=False
         )
 
         try:
