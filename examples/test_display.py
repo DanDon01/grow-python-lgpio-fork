@@ -1,5 +1,6 @@
 from PIL import Image
 import ST7735
+import time
 
 # Display dimensions
 DISPLAY_WIDTH = 160
@@ -25,6 +26,19 @@ image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(255, 255, 255))
 
 # Display the image
 display.display(image)
+
+COLORS = [
+    ("Red", (255, 0, 0)),
+    ("Green", (0, 255, 0)),
+    ("Blue", (0, 0, 255)),
+]
+
+for name, color in COLORS:
+    print(f"Testing {name} color...")
+    image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color)
+    display.display(image)
+    time.sleep(2)
+
 
 # Keep the screen on
 try:
