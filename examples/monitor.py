@@ -1226,6 +1226,10 @@ def main():
         # Set up light sensor
         light = ltr559.LTR559()
         logging.info("Light sensor initialized")
+        while True:
+            ltr559.update_sensor()
+            lux = ltr559.get_lux()
+            prox = ltr559.get_proximity()
 
         # Set up our canvas and prepare for drawing
         image = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(255, 255, 255))
