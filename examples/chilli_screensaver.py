@@ -1,3 +1,5 @@
+# This is version 2.0 of the code
+
 from PIL import Image, ImageDraw, ImageFont
 import time
 import sys
