@@ -19,3 +19,6 @@ library/debian/
 .pytest_cache
 .tox
 .vscode/
+.venv/
+.github
+\examples\venv
