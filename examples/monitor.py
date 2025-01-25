@@ -1139,16 +1139,12 @@ class ViewController:
 
     def button_b(self):
         """Handle Button B presses."""
-        self.view.button_b()
+        return self.view.button_b()
 
     def button_x(self):
-        """Handle Button X presses for subview navigation."""
-        if isinstance(self.view, SettingsView):
-            # Special handling for cycling through SettingsView pages
-            self.view.handle_input("NEXT")
-        elif not self.view.button_x():
+        """Handle Button X presses."""
+        if not self.view.button_x():
             self.next_subview()
-            return True
         return True
 
     def button_y(self):
@@ -1158,9 +1154,9 @@ class ViewController:
     def change_view(self, new_view):
         """Change to a new view dynamically."""
         self.views.append(new_view)
-        self._current_view = len(self.views) - 1  # Switch to the new view
+        self._current_view = len(self.views) - 1
         self._current_subview = 0
-        self.render()  # Render the new view
+        self.render()
 
 class Config:
     def __init__(self):
