@@ -15,7 +15,13 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
         x, y = 0, 0  # Starting position
         dx, dy = 2, 2  # Movement speed and direction
         angle = 0  # Starting angle for rotation
-        rotation_speed = 2  # Degrees per frame
+        rotation_speed = 5  # Increased speed for more noticeable rotation
+        
+        # Convert RGBA to RGB with white background for better rotation
+        bg = Image.new('RGBA', chilli_icon.size, (255, 255, 255, 255))
+        chilli_icon = Image.alpha_composite(bg, chilli_icon)
+        
+        logging.info(f"Chilli size: {chilli_icon.size}, Display size: {width}x{height}")
         
         while not stop_event.is_set():
             try:
@@ -23,36 +29,35 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
                 image = Image.new("RGB", (width, height), (0, 0, 0))
                 
                 # Rotate the chilli
-                rotated_chilli = chilli_icon.rotate(angle, expand=True, resample=Image.BICUBIC)
-                
-                # Calculate position adjustment for rotated image
-                rot_width, rot_height = rotated_chilli.size
-                x_adjust = (rot_width - chilli_icon.size[0]) // 2
-                y_adjust = (rot_height - chilli_icon.size[1]) // 2
+                rotated_chilli = chilli_icon.rotate(angle, resample=Image.BILINEAR)
+                logging.info(f"Rotation angle: {angle}")
                 
                 # Draw rotated chilli at current position
-                image.paste(rotated_chilli, (x - x_adjust, y - y_adjust), mask=rotated_chilli)
+                image.paste(rotated_chilli, (x, y))
                 
                 # Update position
                 x += dx
                 y += dy
                 
                 # Update rotation
-                angle = (angle + rotation_speed) % 360
+                angle += rotation_speed
+                if angle >= 360:
+                    angle = 0
                 
                 # Bounce off edges
-                if x <= x_adjust or x >= width - (chilli_icon.size[0] - x_adjust):
+                if x <= 0 or x >= width - rotated_chilli.size[0]:
                     dx = -dx
-                if y <= y_adjust or y >= height - (chilli_icon.size[1] - y_adjust):
+                if y <= 0 or y >= height - rotated_chilli.size[1]:
                     dy = -dy
                 
                 # Display the image with lock
                 with display_lock:
                     display.display(image)
                 
-                time.sleep(0.03)  # Animation speed
+                time.sleep(0.05)  # Slightly slower for smoother rotation
             except Exception as e:
                 logging.error(f"Error in animation loop: {e}")
+                logging.error(f"Error details: {str(e)}")
                 time.sleep(0.1)
     except Exception as e:
         logging.error(f"Error in screensaver animation: {e}")
