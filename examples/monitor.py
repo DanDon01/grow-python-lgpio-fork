@@ -11,6 +11,7 @@ import subprocess
 import os
 import json
 from datetime import datetime
+import signal
 
 import ltr559
 import lgpio as GPIO  # Change the import to lgpio
@@ -1227,32 +1228,75 @@ def main():
     last_button_press = time.time()
     screensaver_active = False
 
-    # Load icons
-    icons = load_icons()
-    if icons is None:
-        print("Could not load required icons. Please ensure icons/ directory exists with required files.")
-        return
+    def handle_button(chip, gpio, level, tick):
+        global last_button_press
         
-    # Initialize icon globals
-    icon_drop = icons['drop']
-    icon_nodrop = icons['nodrop']
-    icon_rightarrow = icons['rightarrow']
-    icon_alarm = icons['alarm']
-    icon_snooze = icons['snooze']
-    icon_help = icons['help']
-    icon_settings = icons['settings']
-    icon_channel = icons['channel']
-    icon_backdrop = icons['backdrop']
-    icon_return = icons['return']
-    icon_chilli = icons['chilli']
+        index = BUTTONS.index(gpio)
+        label = LABELS[index]
+
+        current_time = time.time()
+        # Debounce: Ignore presses within 0.3 seconds
+        if current_time - last_button_press < 0.3:
+            return
+
+        last_button_press = current_time
+        logging.info(f"Button pressed: {label}")
+
+        if label == "A":
+            viewcontroller.button_a()
+        elif label == "B":
+            if not viewcontroller.button_b():
+                if viewcontroller.home:
+                    if alarm.sleeping():
+                        alarm.cancel_sleep()
+                    else:
+                        alarm.sleep()
+        elif label == "X":
+            viewcontroller.button_x()
+        elif label == "Y":
+            viewcontroller.button_y()
+
+    def cleanup():
+        global screensaver_thread, screensaver_stop_event
+        logging.info("Cleaning up...")
+        screensaver_stop_event.set()
+        if screensaver_thread is not None and screensaver_thread.is_alive():
+            screensaver_thread.join(timeout=1.0)
+        try:
+            GPIO.gpiochip_close(h)
+        except:
+            pass
+
+    # Set up signal handlers for graceful shutdown
+    def signal_handler(signum, frame):
+        logging.info("Shutting down gracefully...")
+        cleanup()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     try:
-        # Set up the ST7735 SPI Display for CE1 on GPIO 7
-        # Run: ls /dev/spidev0.*
-        # See if you have /dev/spidev0.0 or /dev/spidev0.1 (or both).
-        # If you only see spidev0.0, you need cs=0 in Python.
-        # If you only see spidev0.1, you need cs=1 in Python.
-        # Currently have spidev0.0 
+        # Load icons
+        icons = load_icons()
+        if icons is None:
+            print("Could not load required icons. Please ensure icons/ directory exists with required files.")
+            return
+
+        # Initialize icon globals
+        icon_drop = icons['drop']
+        icon_nodrop = icons['nodrop']
+        icon_rightarrow = icons['rightarrow']
+        icon_alarm = icons['alarm']
+        icon_snooze = icons['snooze']
+        icon_help = icons['help']
+        icon_settings = icons['settings']
+        icon_channel = icons['channel']
+        icon_backdrop = icons['backdrop']
+        icon_return = icons['return']
+        icon_chilli = icons['chilli']
+
+        # Set up the ST7735 SPI Display
         display = ST7735.ST7735(
             port=0,          # SPI0
             cs=0,            # CE0 => GPIO 7 => Pin 26
@@ -1280,7 +1324,6 @@ def main():
         # Set up light sensor
         light = ltr559.LTR559()
         logging.info("Light sensor initialized")
-        
 
         # Set up our canvas and prepare for drawing
         image = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
@@ -1306,27 +1349,23 @@ def main():
         channels = []
         for i in range(3):
             try:
-                # Add longer delay between channel attempts
                 time.sleep(0.5)
-                
                 channel = Channel(i+1, i+1, i+1, gpio_handle=h)
                 channel.initialize()
                 
-                # Only add if both sensor and pump initialized successfully
                 if channel.sensor is not None and channel.sensor.active:
                     channels.append(channel)
                     logging.info(f"Successfully initialized channel {i+1}")
                 else:
                     logging.error(f"Channel {i+1} sensor initialization failed")
-                    
             except Exception as e:
                 logging.error(f"Failed to initialize channel {i+1}: {e}")
         
-        # Verify we have at least one working channel
         if not channels:
             logging.error("No channels could be initialized")
             return
 
+        # Initialize alarm and config
         alarm = Alarm(image)
         config = Config()
 
@@ -1337,11 +1376,12 @@ def main():
             logging.error(f"Failed to load configuration: {e}")
             return
 
+        # Update channels and alarm from config
         for channel in channels:
             channel.update_from_yml(config.get_channel(channel.channel))
-
         alarm.update_from_yml(config.get_general())
 
+        # Print current configuration
         print("Channels:")
         for channel in channels:
             print(channel)
@@ -1358,7 +1398,9 @@ def main():
                 config.get_general().get("black_screen_when_light_low"),
                 config.get_general().get("light_level_low")
             )
+        )
 
+        # Set up main options
         main_options = [
             {
                 "title": "Alarm Interval",
@@ -1380,7 +1422,7 @@ def main():
             },
         ]
 
-        # Modify viewcontroller initialization to handle missing channels
+        # Initialize views and viewcontroller
         views = [(MainView(image, channels=channels, alarm=alarm),
                  SettingsView(image, options=main_options))]
                  
@@ -1392,6 +1434,7 @@ def main():
 
         viewcontroller = ViewController(views)
 
+        # Main loop
         while True:
             try:
                 # Update channels
@@ -1405,9 +1448,7 @@ def main():
                 write_sensor_data(channels, light)
 
                 light_level_low = light.get_lux() < config.get_general().get("light_level_low")
-
                 alarm.update(light_level_low)
-
                 viewcontroller.update()
 
                 with display_lock:
@@ -1431,7 +1472,6 @@ def main():
                 )
 
                 config.save()
-
                 time.sleep(1.0 / FPS)  # Slower updates
                 
             except Exception as e:
@@ -1445,7 +1485,7 @@ def main():
     finally:
         print("Cleaning up...")
         try:
-            GPIO.gpiochip_close(h)  # Also fix the variable name to h instead of gpio_handle
+            GPIO.gpiochip_close(h)
         except:
             pass
 
