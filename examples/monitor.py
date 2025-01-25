@@ -28,6 +28,7 @@ print("Imported draw_chilli_animation from:", draw_chilli_animation.__module__)
 from threading import Thread
 from threading import Event
 from threading import Lock
+from flask_app import app
 
 # Global variables
 viewcontroller = None
@@ -1273,6 +1274,15 @@ def main():
     # Initialize globals
     last_button_press = time.time()
     screensaver_active = False
+
+    # Start Flask app in a separate thread
+    def run_flask():
+        app.run(host='0.0.0.0', port=5000)
+    
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.daemon = True  # This ensures the Flask thread will stop when the main program stops
+    flask_thread.start()
+    logging.info("Flask server started on port 5000")
 
     def handle_button(chip, gpio, level, tick):
         global last_button_press, screensaver_active, screensaver_stop_event, viewcontroller
