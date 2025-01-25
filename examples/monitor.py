@@ -419,20 +419,12 @@ class SettingsView(EditView):
 
     def __init__(self, image, options=[]):
         self.main_options = options  # Store the main options
-        self.screensaver_options = ["Enable Screensaver", "Disable Screensaver", "Back"]
         self.current_menu = "main"  # Track which menu we're in
         self.current_selection = 0
         super().__init__(image, options)
 
     def render(self):
         self.clear()
-        self._draw.text(
-            (28, 5),
-            "Settings" if self.current_menu == "main" else "Screensaver",
-            font=self.font,
-            fill=COLOR_WHITE,
-        )
-
         if self.current_menu == "main":
             # Render main settings
             option = self.main_options[self._current_option]
@@ -442,66 +434,108 @@ class SettingsView(EditView):
             value = getattr(object, prop)
             text = option["format"](value)
             
+            self._draw.text(
+                (28, 5),
+                "Settings",
+                font=self.font,
+                fill=COLOR_WHITE,
+            )
             self._draw.text((3, 36), f"{title} : {text}", font=self.font, fill=COLOR_WHITE)
-            
-            # Add screensaver menu option at the bottom
-            self._draw.text((3, 60), "Next: Screensaver Menu", font=self.font, fill=COLOR_WHITE)
+            self._draw.text((3, 60), "X: Next  Y: Increase  B: Decrease", font=self.font, fill=COLOR_WHITE)
         else:
-            # Render screensaver menu options
-            for i, option in enumerate(self.screensaver_options):
-                y_position = 25 + i * 20
-                color = COLOR_GREEN if i == self.current_selection else COLOR_WHITE
-                self._draw.text((20, y_position), option, font=self.font, fill=color)
+            # Render screensaver menu
+            self._draw.text(
+                (28, 5),
+                "Screensaver",
+                font=self.font,
+                fill=COLOR_WHITE,
+            )
+            if not screensaver_active:
+                self._draw.text((3, 36), "Press Y to activate", font=self.font, fill=COLOR_WHITE)
+            else:
+                self._draw.text((3, 36), "Press Y to deactivate", font=self.font, fill=COLOR_WHITE)
+            self._draw.text((3, 60), "X: Back to main menu", font=self.font, fill=COLOR_WHITE)
 
     def button_b(self):
-        """Handle selection"""
+        """Handle decrease value"""
         if self.current_menu == "main":
-            return super().button_b()
-        else:
-            global screensaver_active, screensaver_thread, screensaver_stop_event, display, icons
-            
-            selected_option = self.screensaver_options[self.current_selection]
-            
-            if selected_option == "Enable Screensaver":
-                if not screensaver_active:
-                    screensaver_stop_event.clear()
-                    screensaver_thread = Thread(
-                        target=draw_chilli_animation,
-                        args=(display, icons, screensaver_stop_event, display_lock)
-                    )
-                    screensaver_thread.daemon = True
-                    screensaver_thread.start()
-                    screensaver_active = True
-                    logging.info("Screensaver enabled")
-            elif selected_option == "Disable Screensaver":
-                if screensaver_active:
-                    screensaver_stop_event.set()
-                    screensaver_active = False
-                    logging.info("Screensaver disabled")
-            elif selected_option == "Back":
-                self.current_menu = "main"
-                self.current_selection = 0
-            
+            option = self.main_options[self._current_option]
+            prop = option["prop"]
+            mode = option.get("mode", "int")
+            object = option.get("object", self.channel)
+
+            value = getattr(object, prop)
+            if mode == "bool":
+                value = False
+            else:
+                inc = option["inc"]
+                limit = option["min"]
+                value -= inc
+                if mode == "float":
+                    value = round(value, option.get("round", 1))
+                if value < limit:
+                    value = limit
+            setattr(object, prop, value)
             return True
+        return False
 
     def button_x(self):
-        """Handle next/previous navigation"""
+        """Handle menu navigation"""
         if self.current_menu == "main":
             if self._current_option >= len(self.main_options) - 1:
                 # Switch to screensaver menu
                 self.current_menu = "screensaver"
-                self.current_selection = 0
                 return True
-            return super().button_x()
-        return True
+            self._current_option += 1
+            return True
+        else:
+            # Return to main menu
+            self.current_menu = "main"
+            self._current_option = 0
+            return True
 
     def button_y(self):
-        """Move selection"""
+        """Handle increase value or screensaver toggle"""
+        global screensaver_active, screensaver_thread, screensaver_stop_event, display, icons
+        
         if self.current_menu == "main":
-            return super().button_y()
+            option = self.main_options[self._current_option]
+            prop = option["prop"]
+            mode = option.get("mode", "int")
+            object = option.get("object", self.channel)
+
+            value = getattr(object, prop)
+            if mode == "bool":
+                value = True
+            else:
+                inc = option["inc"]
+                limit = option["max"]
+                value += inc
+                if mode == "float":
+                    value = round(value, option.get("round", 1))
+                if value > limit:
+                    value = limit
+            setattr(object, prop, value)
         else:
-            self.current_selection = (self.current_selection + 1) % len(self.screensaver_options)
-            return True
+            # Toggle screensaver
+            if not screensaver_active:
+                screensaver_stop_event.clear()
+                screensaver_thread = Thread(
+                    target=draw_chilli_animation,
+                    args=(display, icons, screensaver_stop_event, display_lock)
+                )
+                screensaver_thread.daemon = True
+                screensaver_thread.start()
+                screensaver_active = True
+                logging.info("Screensaver enabled")
+            else:
+                screensaver_stop_event.set()
+                screensaver_active = False
+                logging.info("Screensaver disabled")
+                # Return to main menu when deactivating
+                self.current_menu = "main"
+                self._current_option = 0
+        return True
 
 
 class ScreensaverSettingsView(View):
@@ -1162,7 +1196,6 @@ class Config:
             except yaml.parser.ParserError as e:
                 raise yaml.parser.ParserError(
                     "Error parsing settings file: {} ({})".format(settings_file, e)
-                )
 
     def save(self, settings_file="settings.yml"):
         if len(sys.argv) > 1:
