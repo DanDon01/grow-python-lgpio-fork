@@ -35,6 +35,7 @@ def tint_image(image, hue):
 
 def draw_chilli_animation(display, icons, stop_event, display_lock):
     """Draw chilli animation on the display."""
+    logging.info("Starting chilli animation from chilli_screensaver.py")  # Debug log
     try:
         chilli_icon = icons['chilli']
         width, height = display.width, display.height
@@ -50,6 +51,8 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
         ]
         color_step = 0.01  # Steps between colors
         current_hue = colors[0]
+        
+        logging.info(f"Initial color: {current_hue}")  # Debug log
         
         while not stop_event.is_set():
             try:
@@ -76,6 +79,7 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
                     # Move to next color
                     color_index = (color_index + 1) % len(colors)
                     target_color = colors[color_index]
+                    logging.info(f"Color transition: {current_hue} -> {target_color}")  # Debug log
                 
                 # Move current_hue towards target_color
                 if current_hue < target_color:
