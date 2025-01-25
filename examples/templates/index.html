@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chilli Pots Growth Monitor</title>
+    <title>Grow Hat Information</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -50,74 +50,14 @@
         .pump-buttons button:hover {
             background-color: #45a049;
         }
-        .chart-container {
-            width: 100%;
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-        }
-        .alarm-indicator {
-            color: red;
-            font-size: 20px;
-        }
     </style>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
-    <script>
-        function updateData() {
-            fetch('/sensors')
-                .then(response => response.json())
-                .then(data => {
-                    // Update current readings
-                    Object.entries(data).forEach(([channel, info]) => {
-                        document.getElementById(`${channel}-moisture`).textContent = 
-                            `${info.moisture.toFixed(2)} Hz`;
-                        document.getElementById(`${channel}-saturation`).textContent = 
-                            `${info.saturation.toFixed(2)}%`;
-                    });
-                });
-
-            // Update history graphs
-            fetch('/history')
-                .then(response => response.json())
-                .then(data => {
-                    Object.entries(data).forEach(([channel, history]) => {
-                        const trace = {
-                            y: history,
-                            type: 'scatter'
-                        };
-                        Plotly.newPlot(`${channel}-graph`, [trace]);
-                    });
-                });
-        }
-
-        // Update every 2 seconds
-        setInterval(updateData, 2000);
-    </script>
 </head>
 <body>
-    <h1>Grow Monitor</h1>
+    <h1>Grow Hat Information</h1>
     <div class="container">
-        <div id="channel1">
-            <h2>Channel 1</h2>
-            <p>Moisture: <span id="channel1-moisture">--</span></p>
-            <p>Saturation: <span id="channel1-saturation">--</span></p>
-            <div id="channel1-graph"></div>
-        </div>
-        <div id="channel2">
-            <h2>Channel 2</h2>
-            <p>Moisture: <span id="channel2-moisture">--</span></p>
-            <p>Saturation: <span id="channel2-saturation">--</span></p>
-            <div id="channel2-graph"></div>
-        </div>
-        <div id="channel3">
-            <h2>Channel 3</h2>
-            <p>Moisture: <span id="channel3-moisture">--</span></p>
-            <p>Saturation: <span id="channel3-saturation">--</span></p>
-            <div id="channel3-graph"></div>
+        <h2>Sensor Data</h2>
+        <div class="chart-container">
+            <canvas id="sensorChart"></canvas>
         </div>
         <h2>Logs</h2>
         <div class="logs" id="logs">
@@ -130,8 +70,7 @@
             <button onclick="runPump(3)">Run Pump 3</button>
         </div>
     </div>
-    <div id="charts-container"></div>
-    <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         async function fetchSensorData() {
             const response = await fetch('/sensors');

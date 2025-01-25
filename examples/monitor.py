@@ -399,7 +399,9 @@ class SettingsView(EditView):
     """Main settings."""
 
     def __init__(self, image, options=[]):
-        EditView.__init__(self, image, options)
+        # Add screensaver option to the settings menu
+        options.extend(["Screensaver Settings"])
+        super().__init__(image, options)
 
     def render(self):
         self.clear()
@@ -409,7 +411,84 @@ class SettingsView(EditView):
             font=self.font,
             fill=COLOR_WHITE,
         )
-        EditView.render(self)
+        super().render()
+
+    def handle_selection(self, selection):
+        """Handle selection in the settings menu."""
+        if selection == "Screensaver Settings":
+            viewcontroller.change_view(ScreensaverSettingsView(self.image))
+        else:
+            super().handle_selection(selection)
+            
+class SettingsView(EditView):
+    """Main settings."""
+
+    def __init__(self, image, options=[]):
+        # Add screensaver option to the settings menu
+        options.extend(["Screensaver Settings"])
+        super().__init__(image, options)
+
+    def render(self):
+        self.clear()
+        self._draw.text(
+            (28, 5),
+            "Settings",
+            font=self.font,
+            fill=COLOR_WHITE,
+        )
+        super().render()
+
+    def handle_selection(self, selection):
+        """Handle selection in the settings menu."""
+        if selection == "Screensaver Settings":
+            # Switch to the ScreensaverSettingsView
+            viewcontroller.change_view(ScreensaverSettingsView(self.image))
+        else:
+            super().handle_selection(selection)
+
+
+class ScreensaverSettingsView(View):
+    """Settings for configuring the screensaver."""
+
+    def __init__(self, image):
+        super().__init__(image)
+        self.options = ["Enable Screensaver", "Disable Screensaver", "Back to Settings"]
+        self.current_selection = 0
+
+    def render(self):
+        self.clear()
+        self._draw.text(
+            (20, 5),
+            "Screensaver Settings",
+            font=self.font,
+            fill=COLOR_WHITE,
+        )
+
+        for i, option in enumerate(self.options):
+            y_position = 25 + i * 20
+            color = COLOR_GREEN if i == self.current_selection else COLOR_WHITE
+            self._draw.text((20, y_position), option, font=self.font, fill=color)
+
+    def handle_input(self, input_label):
+        """Handle user input in the screensaver settings menu."""
+        if input_label == "UP":
+            self.current_selection = (self.current_selection - 1) % len(self.options)
+        elif input_label == "DOWN":
+            self.current_selection = (self.current_selection + 1) % len(self.options)
+        elif input_label == "SELECT":
+            if self.options[self.current_selection] == "Back to Settings":
+                # Remove this view and return to the main settings menu
+                viewcontroller.views.pop()
+                viewcontroller._current_view -= 1
+                viewcontroller.render()
+            elif self.options[self.current_selection] == "Enable Screensaver":
+                print("Screensaver enabled")
+                # Implement enabling the screensaver logic here
+            elif self.options[self.current_selection] == "Disable Screensaver":
+                print("Screensaver disabled")
+                # Implement disabling the screensaver logic here
+
+        self.render()
 
 
 class ChannelView(View):
@@ -972,6 +1051,14 @@ class ViewController:
 
     def button_y(self):
         return self.view.button_y()
+
+    def change_view(self, new_view):
+        """Change to a new view dynamically."""
+        self.views.append(new_view)
+        self._current_view = len(self.views) - 1  # Set to the new view
+        self._current_subview = 0
+        self.render()  # Render the new view
+
 
 class Config:
     def __init__(self):
