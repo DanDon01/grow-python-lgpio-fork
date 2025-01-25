@@ -8,56 +8,50 @@ import math
 
 def draw_chilli_animation(display, icons, stop_event, display_lock):
     """Draw chilli animation on the display."""
-    logging.info("Starting chilli animation from chilli_screensaver.py")
+    logging.info("TEST TEST TEST - USING CHILLI_SCREENSAVER.PY")  # Very obvious log message
+    
+    # Make it move in a square pattern instead of bouncing
     try:
         chilli_icon = icons['chilli']
         width, height = display.width, display.height
-        x, y = 0, 0  # Starting position
-        dx, dy = 2, 2  # Movement speed and direction
-        angle = 0  # Starting angle for rotation
-        rotation_speed = 5  # Increased speed for more noticeable rotation
+        x, y = 0, 0
         
-        # Convert RGBA to RGB with white background for better rotation
-        bg = Image.new('RGBA', chilli_icon.size, (255, 255, 255, 255))
-        chilli_icon = Image.alpha_composite(bg, chilli_icon)
-        
-        logging.info(f"Chilli size: {chilli_icon.size}, Display size: {width}x{height}")
+        # Define square movement pattern
+        moves = [
+            (2, 0),    # Move right
+            (0, 2),    # Move down
+            (-2, 0),   # Move left
+            (0, -2),   # Move up
+        ]
+        current_move = 0
+        steps = 0
+        max_steps = 30  # Number of steps before changing direction
         
         while not stop_event.is_set():
             try:
-                # Create a new image for each frame
                 image = Image.new("RGB", (width, height), (0, 0, 0))
-                
-                # Rotate the chilli
-                rotated_chilli = chilli_icon.rotate(angle, resample=Image.BILINEAR)
-                logging.info(f"Rotation angle: {angle}")
-                
-                # Draw rotated chilli at current position
-                image.paste(rotated_chilli, (x, y))
+                image.paste(chilli_icon, (x, y), mask=chilli_icon)
                 
                 # Update position
+                dx, dy = moves[current_move]
                 x += dx
                 y += dy
                 
-                # Update rotation
-                angle += rotation_speed
-                if angle >= 360:
-                    angle = 0
+                steps += 1
+                if steps >= max_steps:
+                    steps = 0
+                    current_move = (current_move + 1) % len(moves)
                 
-                # Bounce off edges
-                if x <= 0 or x >= width - rotated_chilli.size[0]:
-                    dx = -dx
-                if y <= 0 or y >= height - rotated_chilli.size[1]:
-                    dy = -dy
+                # Keep within bounds
+                x = max(0, min(x, width - chilli_icon.size[0]))
+                y = max(0, min(y, height - chilli_icon.size[1]))
                 
-                # Display the image with lock
                 with display_lock:
                     display.display(image)
                 
-                time.sleep(0.05)  # Slightly slower for smoother rotation
+                time.sleep(0.05)
             except Exception as e:
                 logging.error(f"Error in animation loop: {e}")
-                logging.error(f"Error details: {str(e)}")
                 time.sleep(0.1)
     except Exception as e:
         logging.error(f"Error in screensaver animation: {e}")
