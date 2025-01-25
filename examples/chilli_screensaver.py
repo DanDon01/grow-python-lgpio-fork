@@ -10,22 +10,27 @@ import colorsys
 
 def tint_image(image, hue):
     """Tint the image with a specific hue while maintaining its alpha channel."""
-    # Convert hue to RGB (hue ranges from 0 to 1)
+    # Convert hue to RGB with full saturation and value
     rgb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
+    
+    # Create multipliers for stronger effect
+    multiplier = 2.0  # Increase this for stronger colors
+    r_mult = rgb[0] * multiplier
+    g_mult = rgb[1] * multiplier
+    b_mult = rgb[2] * multiplier
     
     # Split the image into bands
     r, g, b, a = image.split()
     
-    # Create a new image with the tint color, with stronger effect
+    # Create a new image with the tint color
     tinted = Image.merge('RGB', (
-        r.point(lambda x: int(x * rgb[0] * 1.5)),  # Increase color intensity
-        g.point(lambda x: int(x * rgb[1] * 1.5)),
-        b.point(lambda x: int(x * rgb[2] * 1.5))
+        r.point(lambda x: min(255, int(x * r_mult))),
+        g.point(lambda x: min(255, int(x * g_mult))),
+        b.point(lambda x: min(255, int(x * b_mult)))
     ))
     
     # Add back the alpha channel
     tinted.putalpha(a)
-    
     return tinted
 
 def draw_chilli_animation(display, icons, stop_event, display_lock):
@@ -37,20 +42,22 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
         dx, dy = 2, 2  # Movement speed and direction
         
         # Color transition variables
-        hue = 0.33  # Start with green (HSV: 120 degrees = 0.33)
-        hue_step = 0.005  # Larger step for more noticeable transition
+        color_index = 0
+        colors = [
+            0.33,  # Green (HSV: 120 degrees)
+            0.17,  # Yellow (HSV: 60 degrees)
+            0.0    # Red (HSV: 0 degrees)
+        ]
+        color_step = 0.01  # Steps between colors
+        current_hue = colors[0]
         
         while not stop_event.is_set():
             try:
                 # Create a new image for each frame
                 image = Image.new("RGB", (width, height), (0, 0, 0))
                 
-                # Tint the chilli with current hue
-                # Map hue to color transitions: green -> yellow -> red
-                current_hue = max(0.0, min(0.33, hue))  # Clamp between 0 (red) and 0.33 (green)
+                # Tint the chilli with current color
                 tinted_chilli = tint_image(chilli_icon, current_hue)
-                
-                # Draw single chilli at current position
                 image.paste(tinted_chilli, (x, y), mask=tinted_chilli)
                 
                 # Update position
@@ -63,10 +70,18 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
                 if y <= 0 or y >= height - chilli_icon.size[1]:
                     dy = -dy
                 
-                # Update hue (cycle through green -> yellow -> red)
-                hue -= hue_step  # Decrease hue to go from green to red
-                if hue < 0:  # Reset when we reach red
-                    hue = 0.33  # Back to green
+                # Update color
+                target_color = colors[color_index]
+                if abs(current_hue - target_color) < color_step:
+                    # Move to next color
+                    color_index = (color_index + 1) % len(colors)
+                    target_color = colors[color_index]
+                
+                # Move current_hue towards target_color
+                if current_hue < target_color:
+                    current_hue = min(target_color, current_hue + color_step)
+                else:
+                    current_hue = max(target_color, current_hue - color_step)
                 
                 # Display the image with lock
                 with display_lock:
