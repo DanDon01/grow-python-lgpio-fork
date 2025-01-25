@@ -648,7 +648,7 @@ class DetailView(ChannelView):
             alarm_line = int(self.channel.warn_level * graph_height)
             r = 255
             if self.channel.alarm:
-                r = int(((math.sin(time.time() * 3 * math.pi) + 1.0) / 2.0) * 128) + 127)
+                r = int(((math.sin(time.time() * 3 * math.pi) + 1.0) / 2.0) * 128) + 127
 
             self._draw.rectangle(
                 (
