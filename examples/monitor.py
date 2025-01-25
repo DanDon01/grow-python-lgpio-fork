@@ -648,7 +648,7 @@ class DetailView(ChannelView):
             alarm_line = int(self.channel.warn_level * graph_height)
             r = 255
             if self.channel.alarm:
-                r = int(((math.sin(time.time() * 3 * math.pi) + 1.0) / 2.0) * 128) + 127
+                r = int(((math.sin(time.time() * 3 * math.pi) + 1.0) / 2.0) * 128) + 127)
 
             self._draw.rectangle(
                 (
@@ -1275,6 +1275,24 @@ def write_daily_history(data, current_time):
     except Exception as e:
         logging.error(f"Failed to write daily history: {e}")
 
+def normalize_moisture(raw_value):
+    """Normalize moisture readings to a 0-100 scale"""
+    # Observed ADC values from the moisture sensor
+    MIN_MOISTURE = 0      # Completely dry
+    MAX_MOISTURE = 13000  # Completely wet (adjusted based on observed values)
+    
+    # Log the raw value for debugging
+    logging.debug(f"Raw moisture value before normalization: {raw_value}")
+    
+    # Clamp the value between min and max
+    clamped = max(MIN_MOISTURE, min(raw_value, MAX_MOISTURE))
+    
+    # Invert the scale (higher raw value = drier soil)
+    normalized = 100 - ((clamped / MAX_MOISTURE) * 100)
+    
+    logging.debug(f"Normalized moisture value: {normalized}%")
+    return normalized
+
 def write_sensor_data(channels, light):
     """Write current sensor data to JSON file with history"""
     current_time = datetime.now()
@@ -1302,15 +1320,29 @@ def write_sensor_data(channels, light):
         }
     }
     
-    # Update current sensor readings - only moisture level
+    # Update current sensor readings - only moisture level and status
     for channel in channels:
         if channel and channel.sensor and channel.sensor.active:
+            raw_moisture = channel.sensor.moisture  # Get raw value
+            
+            # Log min/max values seen
+            if not hasattr(channel, 'min_moisture'):
+                channel.min_moisture = raw_moisture
+                channel.max_moisture = raw_moisture
+            else:
+                channel.min_moisture = min(channel.min_moisture, raw_moisture)
+                channel.max_moisture = max(channel.max_moisture, raw_moisture)
+            
+            logging.info(f"Channel {channel.channel} - Raw: {raw_moisture} (Min: {channel.min_moisture}, Max: {channel.max_moisture})")
+            
+            normalized_moisture = normalize_moisture(raw_moisture)
+            
             current_reading['sensors'][f'channel{channel.channel}'] = {
-                'moisture': round(channel.sensor.moisture, 2),
+                'moisture': round(normalized_moisture, 2),
+                'raw_moisture': raw_moisture,  # Keep raw value for debugging
                 'alarm': channel.alarm,
                 'enabled': channel.enabled
             }
-            logging.info(f"Channel {channel.channel}: moisture={round(channel.sensor.moisture, 2)}")
     
     # Add current reading to history
     data['history'].append(current_reading)
