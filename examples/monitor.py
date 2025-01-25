@@ -425,7 +425,8 @@ class SettingsView(EditView):
 
     def __init__(self, image, options=[]):
         # Add screensaver option to the settings menu
-        options.extend(["Screensaver Settings"])
+        if "Screensaver Settings" not in options:  # Avoid duplicate options
+            options.extend(["Screensaver Settings"])
         super().__init__(image, options)
 
     def render(self):
@@ -441,10 +442,11 @@ class SettingsView(EditView):
     def handle_selection(self, selection):
         """Handle selection in the settings menu."""
         if selection == "Screensaver Settings":
-            # Switch to the ScreensaverSettingsView
+            # Safely switch to ScreensaverSettingsView
             viewcontroller.change_view(ScreensaverSettingsView(self.image))
         else:
             super().handle_selection(selection)
+
 
 
 class ScreensaverSettingsView(View):
@@ -476,15 +478,14 @@ class ScreensaverSettingsView(View):
         elif input_label == "DOWN":
             self.current_selection = (self.current_selection + 1) % len(self.options)
         elif input_label == "SELECT":
-            if self.options[self.current_selection] == "Back to Settings":
-                # Remove this view and return to the main settings menu
-                viewcontroller.views.pop()
-                viewcontroller._current_view -= 1
-                viewcontroller.render()
-            elif self.options[self.current_selection] == "Enable Screensaver":
+            selected_option = self.options[self.current_selection]
+            if selected_option == "Back to Settings":
+                # Return to the settings menu
+                viewcontroller.change_view(SettingsView(self.image))
+            elif selected_option == "Enable Screensaver":
                 print("Screensaver enabled")
                 # Implement enabling the screensaver logic here
-            elif self.options[self.current_selection] == "Disable Screensaver":
+            elif selected_option == "Disable Screensaver":
                 print("Screensaver disabled")
                 # Implement disabling the screensaver logic here
 
