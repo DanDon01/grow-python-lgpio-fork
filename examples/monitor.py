@@ -1280,15 +1280,12 @@ def write_sensor_data(channels, light):
     current_time = datetime.now()
     timestamp = current_time.isoformat()
     
-    # Try to load existing data first
     try:
         with open('sensor_data.json', 'r') as f:
             data = json.load(f)
-            # Initialize history if it doesn't exist
             if 'history' not in data:
                 data['history'] = []
     except (FileNotFoundError, json.JSONDecodeError):
-        # Start fresh if file doesn't exist or is invalid
         data = {
             'history': [],
             'sensors': {},
@@ -1300,32 +1297,29 @@ def write_sensor_data(channels, light):
         'timestamp': timestamp,
         'sensors': {},
         'light': {
-            'lux': light.get_lux(),
-            'proximity': light.get_proximity()
+            'lux': round(light.get_lux(), 2),
+            'proximity': round(light.get_proximity(), 2)
         }
     }
     
-    # Update current sensor readings
+    # Update current sensor readings - only moisture level
     for channel in channels:
         if channel and channel.sensor and channel.sensor.active:
             current_reading['sensors'][f'channel{channel.channel}'] = {
-                'moisture': channel.sensor.moisture,
-                'saturation': channel.sensor.saturation * 100,
+                'moisture': round(channel.sensor.moisture, 2),
                 'alarm': channel.alarm,
                 'enabled': channel.enabled
             }
-            logging.info(f"Channel {channel.channel}: moisture={channel.sensor.moisture}, saturation={channel.sensor.saturation * 100}%")
+            logging.info(f"Channel {channel.channel}: moisture={round(channel.sensor.moisture, 2)}")
     
     # Add current reading to history
     data['history'].append(current_reading)
     
-    # Check if we need to archive daily data (when history reaches 24 hours)
-    max_history = 24 * 60 * 60  # 24 hours worth of seconds
+    # Check if we need to archive daily data
+    max_history = 24 * 60 * 60
     if len(data['history']) >= max_history:
-        # Archive current history before truncating
         write_daily_history(data, current_time)
-        # Keep only the most recent hour of data to avoid gaps
-        data['history'] = data['history'][-3600:]  # Keep last hour
+        data['history'] = data['history'][-3600:]
     
     # Update current readings
     data['timestamp'] = timestamp
