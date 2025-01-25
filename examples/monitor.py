@@ -1220,14 +1220,14 @@ def main():
     last_button_press = 0
     screensaver_active = False
 
-    def handle_button(chip, gpio, level, tick):
-        global last_button_press, screensaver_thread, screensaver_active
+def handle_button(chip, gpio, level, tick):
+    global last_button_press, screensaver_thread, screensaver_stop_event, screensaver_active
 
-        index = BUTTONS.index(gpio)
-        label = LABELS[index]
+    index = BUTTONS.index(gpio)
+    label = LABELS[index]
 
-        current_time = time.time()
-        # Debounce: Ignore presses within 0.3 seconds
+    current_time = time.time()  # Ensure current_time is defined before using it
+    # Debounce: Ignore presses within 0.3 seconds
     if current_time - last_button_press < 0.3:
         return
 
@@ -1236,6 +1236,7 @@ def main():
 
     if label == "A":
         viewcontroller.button_a()
+
     elif label == "B":
         if not viewcontroller.button_b():
             if viewcontroller.home:
@@ -1243,8 +1244,12 @@ def main():
                     alarm.cancel_sleep()
                 else:
                     alarm.sleep()
+
     elif label == "X":
         viewcontroller.button_x()
+
+    elif label == "Y":
+        print("Button Y no longer starts/stops the screensaver.")  # Remove screensaver logic here
 
 
     def cleanup():
