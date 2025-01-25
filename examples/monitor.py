@@ -24,6 +24,7 @@ from grow import Piezo
 from lgpio_moisture import Moisture  # Use our patched moisture module instead
 from lgpio_pump import Pump  # Use our patched pump module
 from chilli_screensaver import draw_chilli_animation
+print("Imported draw_chilli_animation from:", draw_chilli_animation.__module__)
 from threading import Thread
 from threading import Event
 from threading import Lock
