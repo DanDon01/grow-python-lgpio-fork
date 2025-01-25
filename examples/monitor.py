@@ -27,12 +27,27 @@ from threading import Thread
 from threading import Event
 from threading import Lock
 
-# Add global variables
-viewcontroller = None  # Make viewcontroller global
-display = None        # Make display global
-
-screensaver_stop_event = Event()
+# Global variables
+viewcontroller = None
+display = None
 screensaver_thread = None
+screensaver_stop_event = Event()
+screensaver_active = False
+last_button_press = 0
+icons = None
+
+# Global icon variables
+icon_drop = None
+icon_nodrop = None
+icon_rightarrow = None
+icon_alarm = None
+icon_snooze = None
+icon_help = None
+icon_settings = None
+icon_channel = None
+icon_backdrop = None
+icon_return = None
+icon_chilli = None
 
 FPS = 10
 
@@ -423,25 +438,27 @@ class SettingsView(EditView):
 
     def button_b(self):
         """Handle selection"""
+        global screensaver_active, screensaver_thread, screensaver_stop_event, display, icons
+        
         selected_option = self.options[self.current_selection]
         
         if selected_option == "Enable Screensaver":
-            global screensaver_active, screensaver_thread, screensaver_stop_event
             if not screensaver_active:
                 screensaver_stop_event.clear()
                 screensaver_thread = Thread(
                     target=draw_chilli_animation,
                     args=(display, icons, screensaver_stop_event, display_lock)
                 )
-                screensaver_thread.daemon = True  # Make thread daemon
+                screensaver_thread.daemon = True
                 screensaver_thread.start()
                 screensaver_active = True
+                logging.info("Screensaver enabled")
                 
         elif selected_option == "Disable Screensaver":
-            global screensaver_active, screensaver_stop_event
             if screensaver_active:
                 screensaver_stop_event.set()
                 screensaver_active = False
+                logging.info("Screensaver disabled")
                 
         elif selected_option == "Back to Settings":
             self._current_selection = 0
@@ -1201,24 +1218,22 @@ def draw_chilli_animation(display, icons, stop_event):
 
 
 def main():
-    global viewcontroller, display, screensaver_thread, screensaver_stop_event, last_button_press, screensaver_active
+    global viewcontroller, display, screensaver_thread, screensaver_stop_event
+    global last_button_press, screensaver_active, icons
+    global icon_drop, icon_nodrop, icon_rightarrow, icon_alarm, icon_snooze
+    global icon_help, icon_settings, icon_channel, icon_backdrop, icon_return, icon_chilli
 
     # Initialize globals
-    screensaver_thread = None
-    screensaver_stop_event = Event()
-    last_button_press = time.time()  # Initialize with current time
+    last_button_press = time.time()
     screensaver_active = False
 
-    # Moved icon loading to beginning of main()
+    # Load icons
     icons = load_icons()
     if icons is None:
         print("Could not load required icons. Please ensure icons/ directory exists with required files.")
         return
         
-    # Make icons available to all classes that need them
-    global icon_drop, icon_nodrop, icon_rightarrow, icon_alarm, icon_snooze
-    global icon_help, icon_settings, icon_channel, icon_backdrop, icon_return, icon_chilli
-    
+    # Initialize icon globals
     icon_drop = icons['drop']
     icon_nodrop = icons['nodrop']
     icon_rightarrow = icons['rightarrow']
@@ -1343,7 +1358,6 @@ def main():
                 config.get_general().get("black_screen_when_light_low"),
                 config.get_general().get("light_level_low")
             )
-        )
 
         main_options = [
             {
