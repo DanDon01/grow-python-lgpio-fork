@@ -496,7 +496,7 @@ class SettingsView(EditView):
 
     def button_y(self):
         """Handle increase value or screensaver toggle"""
-        global screensaver_active, screensaver_thread, screensaver_stop_event, display, icons
+        global screensaver_active, screensaver_thread, screensaver_stop_event, display, icons, viewcontroller
         
         if self.current_menu == "main":
             option = self.main_options[self._current_option]
@@ -528,13 +528,16 @@ class SettingsView(EditView):
                 screensaver_thread.start()
                 screensaver_active = True
                 logging.info("Screensaver enabled")
+                # Return to main view when activating screensaver
+                viewcontroller._current_view = 0
+                viewcontroller._current_subview = 0
             else:
                 screensaver_stop_event.set()
                 screensaver_active = False
                 logging.info("Screensaver disabled")
-                # Return to main menu when deactivating
-                self.current_menu = "main"
-                self._current_option = 0
+                # Return to main view when deactivating
+                viewcontroller._current_view = 0
+                viewcontroller._current_subview = 0
         return True
 
 
@@ -1192,7 +1195,6 @@ class Config:
             except yaml.parser.ParserError as e:
                 raise yaml.parser.ParserError(
                     "Error parsing settings file: {} ({})".format(settings_file, e)
-                )
 
     def save(self, settings_file="settings.yml"):
         if len(sys.argv) > 1:
@@ -1266,22 +1268,32 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
     try:
         chilli_icon = icons['chilli']
         width, height = DISPLAY_WIDTH, DISPLAY_HEIGHT
+        x, y = 0, 0  # Starting position
+        dx, dy = 2, 2  # Movement speed and direction
 
         while not stop_event.is_set():
             try:
                 # Create a new image for each frame
                 image = Image.new("RGB", (width, height), (0, 0, 0))
                 
-                # Draw chillis on the image
-                for x in range(0, width, chilli_icon.size[0] + 5):
-                    for y in range(0, height, chilli_icon.size[1] + 5):
-                        image.paste(chilli_icon, (x, y), mask=chilli_icon)
+                # Draw single chilli at current position
+                image.paste(chilli_icon, (x, y), mask=chilli_icon)
+                
+                # Update position
+                x += dx
+                y += dy
+                
+                # Bounce off edges
+                if x <= 0 or x >= width - chilli_icon.size[0]:
+                    dx = -dx
+                if y <= 0 or y >= height - chilli_icon.size[1]:
+                    dy = -dy
                 
                 # Display the image with lock
                 with display_lock:
                     display.display(image)
                 
-                time.sleep(0.2)
+                time.sleep(0.03)  # Faster animation
             except Exception as e:
                 logging.error(f"Error in animation loop: {e}")
                 time.sleep(0.1)

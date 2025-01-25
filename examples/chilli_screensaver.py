@@ -12,29 +12,35 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
     try:
         chilli_icon = icons['chilli']
         width, height = display.width, display.height
-        x, y = 0, 0
-        dx, dy = 1, 1
+        x, y = 0, 0  # Starting position
+        dx, dy = 2, 2  # Movement speed and direction
 
         while not stop_event.is_set():
             try:
-                with display_lock:
-                    image = Image.new("RGB", (width, height), (0, 0, 0))
-                    image.paste(chilli_icon, (x, y), mask=chilli_icon)
-                    display.display(image)
-
+                # Create a new image for each frame
+                image = Image.new("RGB", (width, height), (0, 0, 0))
+                
+                # Draw single chilli at current position
+                image.paste(chilli_icon, (x, y), mask=chilli_icon)
+                
+                # Update position
                 x += dx
                 y += dy
-
-                if x + chilli_icon.width >= width or x <= 0:
+                
+                # Bounce off edges
+                if x <= 0 or x >= width - chilli_icon.size[0]:
                     dx = -dx
-                if y + chilli_icon.height >= height or y <= 0:
+                if y <= 0 or y >= height - chilli_icon.size[1]:
                     dy = -dy
-
-                time.sleep(0.05)
+                
+                # Display the image with lock
+                with display_lock:
+                    display.display(image)
+                
+                time.sleep(0.03)  # Faster animation
             except Exception as e:
                 logging.error(f"Error in animation loop: {e}")
                 time.sleep(0.1)
-                
     except Exception as e:
         logging.error(f"Error in screensaver animation: {e}")
     finally:
