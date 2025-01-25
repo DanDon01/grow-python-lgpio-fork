@@ -36,20 +36,24 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
         logging.info(f"Chilli size: {chilli_icon.size}")
         
         x, y = width//2, height//2  # Start from center
-        dx, dy = 1.5, 1.5  # Slower, smoother movement using floats
+        dx, dy = 1.0, 1.0  # Even slower movement
         angle = 0  # Starting angle for rotation
-        rotation_speed = 3  # Keep current rotation speed
+        rotation_speed = 0.2  # Much slower rotation
         
         # Store actual position as floats for smoother movement
         float_x = float(x)
         float_y = float(y)
+        float_angle = 0.0  # Use float for smoother rotation
         
         # Color transition variables
         hue = 0.33  # Start with green (HSV: 120 degrees = 0.33)
         hue_step = 0.001  # Small step for smooth transition
         
         # Add padding to prevent edge stutter
-        edge_padding = 2
+        edge_padding = 4  # Slightly more padding
+        
+        # Add bounce dampening
+        bounce_dampening = 0.8  # Reduce speed slightly on bounce
         
         while not stop_event.is_set():
             try:
@@ -58,7 +62,7 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
                 
                 # Tint and rotate the chilli
                 tinted_chilli = tint_image(chilli_icon, hue)
-                rotated_chilli = tinted_chilli.rotate(angle, expand=True, resample=Image.BICUBIC)
+                rotated_chilli = tinted_chilli.rotate(float_angle, expand=True, resample=Image.BICUBIC)
                 
                 # Calculate position adjustment for rotated image
                 rot_width, rot_height = rotated_chilli.size
@@ -73,26 +77,35 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
                 x = int(float_x)
                 y = int(float_y)
                 
-                # Bounce off edges with padding, accounting for rotated size
+                # Bounce off edges with padding and dampening
                 if float_x <= edge_padding + x_adjust:  # Left edge
                     float_x = edge_padding + x_adjust
-                    dx = abs(dx)  # Move right
+                    dx = abs(dx) * bounce_dampening  # Move right with dampening
                 elif float_x >= width - rot_width + x_adjust - edge_padding:  # Right edge
                     float_x = width - rot_width + x_adjust - edge_padding
-                    dx = -abs(dx)  # Move left
+                    dx = -abs(dx) * bounce_dampening  # Move left with dampening
                 
                 if float_y <= edge_padding + y_adjust:  # Top edge
                     float_y = edge_padding + y_adjust
-                    dy = abs(dy)  # Move down
+                    dy = abs(dy) * bounce_dampening  # Move down with dampening
                 elif float_y >= height - rot_height + y_adjust - edge_padding:  # Bottom edge
                     float_y = height - rot_height + y_adjust - edge_padding
-                    dy = -abs(dy)  # Move up
+                    dy = -abs(dy) * bounce_dampening  # Move up with dampening
+                
+                # Gradually restore speed if it gets too slow
+                min_speed = 0.8
+                if abs(dx) < min_speed:
+                    dx = min_speed if dx > 0 else -min_speed
+                if abs(dy) < min_speed:
+                    dy = min_speed if dy > 0 else -min_speed
                 
                 # Draw rotated and tinted chilli
                 image.paste(rotated_chilli, (x - x_adjust, y - y_adjust), mask=rotated_chilli)
                 
-                # Update rotation
-                angle = (angle + rotation_speed) % 360
+                # Update rotation using float for smoother movement
+                float_angle += rotation_speed
+                if float_angle >= 360:
+                    float_angle -= 360
                 
                 # Update color (green -> yellow -> red)
                 hue -= hue_step  # Decrease hue to go from green to red
