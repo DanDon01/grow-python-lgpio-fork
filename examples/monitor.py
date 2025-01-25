@@ -27,6 +27,9 @@ from threading import Thread
 from threading import Event
 from threading import Lock
 
+# Add global variables
+viewcontroller = None  # Make viewcontroller global
+display = None        # Make display global
 
 screensaver_stop_event = Event()
 screensaver_thread = None
@@ -399,10 +402,9 @@ class SettingsView(EditView):
     """Main settings."""
 
     def __init__(self, image, options=[]):
-        # Add screensaver option to the settings menu
-        options.extend(["Activate Screensaver", "Back to Settings"])
-        super().__init__(image, options)
+        self.options = ["Enable Screensaver", "Disable Screensaver", "Back to Settings"]
         self.current_selection = 0
+        super().__init__(image, options)
 
     def render(self):
         self.clear()
@@ -419,55 +421,42 @@ class SettingsView(EditView):
             color = COLOR_GREEN if i == self.current_selection else COLOR_WHITE
             self._draw.text((20, y_position), option, font=self.font, fill=color)
 
-    def handle_selection(self, selection):
-        """Handle selection in the settings menu."""
-        if selection == "Activate Screensaver":
-            logging.info("Starting screensaver...")
-            subprocess.Popen([sys.executable, "chilli_screensaver.py"])  # Start the screensaver
-        elif selection == "Back to Settings":
-            viewcontroller.change_view(SettingsView(self.image))  # Return to main settings menu
-        else:
-            super().handle_selection(selection)
-
-    def handle_input(self, input_label):
-        """Handle user input for the settings menu."""
-        if input_label == "UP":
-            self.current_selection = (self.current_selection - 1) % len(self.options)
-        elif input_label == "DOWN":
-            self.current_selection = (self.current_selection + 1) % len(self.options)
-        elif input_label == "SELECT":
-            selected_option = self.options[self.current_selection]
-            self.handle_selection(selected_option)
-        self.render()
-
+    def button_b(self):
+        """Handle selection"""
+        selected_option = self.options[self.current_selection]
+        
+        if selected_option == "Enable Screensaver":
+            global screensaver_active, screensaver_thread, screensaver_stop_event
+            if not screensaver_active:
+                screensaver_stop_event.clear()
+                screensaver_thread = Thread(
+                    target=draw_chilli_animation,
+                    args=(display, icons, screensaver_stop_event, display_lock)
+                )
+                screensaver_thread.daemon = True  # Make thread daemon
+                screensaver_thread.start()
+                screensaver_active = True
+                
+        elif selected_option == "Disable Screensaver":
+            global screensaver_active, screensaver_stop_event
+            if screensaver_active:
+                screensaver_stop_event.set()
+                screensaver_active = False
+                
+        elif selected_option == "Back to Settings":
+            self._current_selection = 0
             
-class SettingsView(EditView):
-    """Main settings."""
+        return True
 
-    def __init__(self, image, options=[]):
-        # Add screensaver option to the settings menu
-        if "Screensaver Settings" not in options:  # Avoid duplicate options
-            options.extend(["Screensaver Settings"])
-        super().__init__(image, options)
+    def button_y(self):
+        """Move selection down"""
+        self.current_selection = (self.current_selection + 1) % len(self.options)
+        return True
 
-    def render(self):
-        self.clear()
-        self._draw.text(
-            (28, 5),
-            "Settings",
-            font=self.font,
-            fill=COLOR_WHITE,
-        )
-        super().render()
-
-    def handle_selection(self, selection):
-        """Handle selection in the settings menu."""
-        if selection == "Screensaver Settings":
-            # Safely switch to ScreensaverSettingsView
-            viewcontroller.change_view(ScreensaverSettingsView(self.image))
-        else:
-            super().handle_selection(selection)
-
+    def button_x(self):
+        """Move selection up"""
+        self.current_selection = (self.current_selection - 1) % len(self.options)
+        return True
 
 
 class ScreensaverSettingsView(View):
@@ -1212,67 +1201,13 @@ def draw_chilli_animation(display, icons, stop_event):
 
 
 def main():
-    global screensaver_thread, screensaver_stop_event, last_button_press, screensaver_active
+    global viewcontroller, display, screensaver_thread, screensaver_stop_event, last_button_press, screensaver_active
 
-    # Global variables
+    # Initialize globals
     screensaver_thread = None
-    screensaver_stop_event = Event()  # Event for stopping the screensaver
-    last_button_press = 0
+    screensaver_stop_event = Event()
+    last_button_press = time.time()  # Initialize with current time
     screensaver_active = False
-
-def handle_button(chip, gpio, level, tick):
-    global last_button_press, screensaver_thread, screensaver_stop_event, screensaver_active
-
-    index = BUTTONS.index(gpio)
-    label = LABELS[index]
-
-    current_time = time.time()  # Ensure current_time is defined before using it
-    # Debounce: Ignore presses within 0.3 seconds
-    if current_time - last_button_press < 0.3:
-        return
-
-    last_button_press = current_time  # Update last press time
-    print(f"Button pressed: {label}")  # Debug
-
-    if label == "A":
-        viewcontroller.button_a()
-
-    elif label == "B":
-        if not viewcontroller.button_b():
-            if viewcontroller.home:
-                if alarm.sleeping():
-                    alarm.cancel_sleep()
-                else:
-                    alarm.sleep()
-
-    elif label == "X":
-        viewcontroller.button_x()
-
-    elif label == "Y":
-        print("Button Y no longer starts/stops the screensaver.")  # Remove screensaver logic here
-
-
-    def cleanup():
-        global screensaver_thread
-        if screensaver_thread is not None:
-            screensaver_thread.terminate()
-            screensaver_thread.wait()
-            screensaver_thread = None
-
-    # Add signal handler for graceful shutdown
-    import signal
-
-    def signal_handler(signum, frame):
-        print("\nShutting down gracefully...")
-        cleanup()  # Terminate the screensaver process
-        try:
-            GPIO.gpiochip_close(h)
-        except:
-            pass
-        exit(0)
-
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
 
     # Moved icon loading to beginning of main()
     icons = load_icons()
