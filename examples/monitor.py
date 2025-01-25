@@ -418,7 +418,9 @@ class SettingsView(EditView):
     """Main settings."""
 
     def __init__(self, image, options=[]):
-        self.options = ["Enable Screensaver", "Disable Screensaver", "Back to Settings"]
+        self.main_options = options  # Store the main options
+        self.screensaver_options = ["Enable Screensaver", "Disable Screensaver", "Back"]
+        self.current_menu = "main"  # Track which menu we're in
         self.current_selection = 0
         super().__init__(image, options)
 
@@ -426,55 +428,80 @@ class SettingsView(EditView):
         self.clear()
         self._draw.text(
             (28, 5),
-            "Settings",
+            "Settings" if self.current_menu == "main" else "Screensaver",
             font=self.font,
             fill=COLOR_WHITE,
         )
 
-        # Render menu options
-        for i, option in enumerate(self.options):
-            y_position = 25 + i * 20
-            color = COLOR_GREEN if i == self.current_selection else COLOR_WHITE
-            self._draw.text((20, y_position), option, font=self.font, fill=color)
+        if self.current_menu == "main":
+            # Render main settings
+            option = self.main_options[self._current_option]
+            title = option["title"]
+            prop = option["prop"]
+            object = option.get("object", self.channel)
+            value = getattr(object, prop)
+            text = option["format"](value)
+            
+            self._draw.text((3, 36), f"{title} : {text}", font=self.font, fill=COLOR_WHITE)
+            
+            # Add screensaver menu option at the bottom
+            self._draw.text((3, 60), "Next: Screensaver Menu", font=self.font, fill=COLOR_WHITE)
+        else:
+            # Render screensaver menu options
+            for i, option in enumerate(self.screensaver_options):
+                y_position = 25 + i * 20
+                color = COLOR_GREEN if i == self.current_selection else COLOR_WHITE
+                self._draw.text((20, y_position), option, font=self.font, fill=color)
 
     def button_b(self):
         """Handle selection"""
-        global screensaver_active, screensaver_thread, screensaver_stop_event, display, icons
-        
-        selected_option = self.options[self.current_selection]
-        
-        if selected_option == "Enable Screensaver":
-            if not screensaver_active:
-                screensaver_stop_event.clear()
-                screensaver_thread = Thread(
-                    target=draw_chilli_animation,
-                    args=(display, icons, screensaver_stop_event, display_lock)
-                )
-                screensaver_thread.daemon = True
-                screensaver_thread.start()
-                screensaver_active = True
-                logging.info("Screensaver enabled")
-                
-        elif selected_option == "Disable Screensaver":
-            if screensaver_active:
-                screensaver_stop_event.set()
-                screensaver_active = False
-                logging.info("Screensaver disabled")
-                
-        elif selected_option == "Back to Settings":
-            self._current_selection = 0
+        if self.current_menu == "main":
+            return super().button_b()
+        else:
+            global screensaver_active, screensaver_thread, screensaver_stop_event, display, icons
             
+            selected_option = self.screensaver_options[self.current_selection]
+            
+            if selected_option == "Enable Screensaver":
+                if not screensaver_active:
+                    screensaver_stop_event.clear()
+                    screensaver_thread = Thread(
+                        target=draw_chilli_animation,
+                        args=(display, icons, screensaver_stop_event, display_lock)
+                    )
+                    screensaver_thread.daemon = True
+                    screensaver_thread.start()
+                    screensaver_active = True
+                    logging.info("Screensaver enabled")
+            elif selected_option == "Disable Screensaver":
+                if screensaver_active:
+                    screensaver_stop_event.set()
+                    screensaver_active = False
+                    logging.info("Screensaver disabled")
+            elif selected_option == "Back":
+                self.current_menu = "main"
+                self.current_selection = 0
+            
+            return True
+
+    def button_x(self):
+        """Handle next/previous navigation"""
+        if self.current_menu == "main":
+            if self._current_option >= len(self.main_options) - 1:
+                # Switch to screensaver menu
+                self.current_menu = "screensaver"
+                self.current_selection = 0
+                return True
+            return super().button_x()
         return True
 
     def button_y(self):
-        """Move selection down"""
-        self.current_selection = (self.current_selection + 1) % len(self.options)
-        return True
-
-    def button_x(self):
-        """Move selection up"""
-        self.current_selection = (self.current_selection - 1) % len(self.options)
-        return True
+        """Move selection"""
+        if self.current_menu == "main":
+            return super().button_y()
+        else:
+            self.current_selection = (self.current_selection + 1) % len(self.screensaver_options)
+            return True
 
 
 class ScreensaverSettingsView(View):
@@ -1204,18 +1231,25 @@ def write_sensor_data(channels, light):
         logging.error(f"Failed to write sensor data: {e}")
 
 
-def draw_chilli_animation(display, icons, stop_event):
+def draw_chilli_animation(display, icons, stop_event, display_lock):
     """Draw chilli animation on the display."""
-    chilli_icon = icons['chilli']
-    width, height = DISPLAY_WIDTH, DISPLAY_HEIGHT
+    try:
+        chilli_icon = icons['chilli']
+        width, height = DISPLAY_WIDTH, DISPLAY_HEIGHT
 
-    while not stop_event.is_set():
-        with display_lock:
-            for x in range(0, width, chilli_icon.size[0] + 5):  # Adjust spacing as needed
-                for y in range(0, height, chilli_icon.size[1] + 5):
-                    display.image.paste(chilli_icon, (x, y), mask=chilli_icon)
-            display.display(display.image)
-        time.sleep(0.2)  # Adjust for animation speed
+        while not stop_event.is_set():
+            try:
+                with display_lock:
+                    for x in range(0, width, chilli_icon.size[0] + 5):
+                        for y in range(0, height, chilli_icon.size[1] + 5):
+                            display.image.paste(chilli_icon, (x, y), mask=chilli_icon)
+                    display.display(display.image)
+                time.sleep(0.2)
+            except Exception as e:
+                logging.error(f"Error in animation loop: {e}")
+                time.sleep(0.1)
+    except Exception as e:
+        logging.error(f"Error in screensaver animation: {e}")
 
 
 def main():
