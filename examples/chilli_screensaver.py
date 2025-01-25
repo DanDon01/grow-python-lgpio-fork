@@ -8,25 +8,16 @@ from threading import Event, Lock
 import logging
 import colorsys
 
-def tint_image(image, hue):
-    """Tint the image with a specific hue while maintaining its alpha channel."""
-    # Convert hue to RGB with full saturation and value
-    rgb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
-    
-    # Create multipliers for stronger effect
-    multiplier = 2.0  # Increase this for stronger colors
-    r_mult = rgb[0] * multiplier
-    g_mult = rgb[1] * multiplier
-    b_mult = rgb[2] * multiplier
-    
+def tint_image(image, color):
+    """Tint the image with RGB color while maintaining its alpha channel."""
     # Split the image into bands
     r, g, b, a = image.split()
     
     # Create a new image with the tint color
     tinted = Image.merge('RGB', (
-        r.point(lambda x: min(255, int(x * r_mult))),
-        g.point(lambda x: min(255, int(x * g_mult))),
-        b.point(lambda x: min(255, int(x * b_mult)))
+        r.point(lambda x: min(255, int(x * color[0]))),
+        g.point(lambda x: min(255, int(x * color[1]))),
+        b.point(lambda x: min(255, int(x * color[2])))
     ))
     
     # Add back the alpha channel
@@ -35,7 +26,7 @@ def tint_image(image, hue):
 
 def draw_chilli_animation(display, icons, stop_event, display_lock):
     """Draw chilli animation on the display."""
-    logging.info("Starting chilli animation from chilli_screensaver.py")  # Debug log
+    logging.info("Starting chilli animation from chilli_screensaver.py")
     try:
         chilli_icon = icons['chilli']
         width, height = display.width, display.height
@@ -45,22 +36,30 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
         # Color transition variables
         color_index = 0
         colors = [
-            0.33,  # Green (HSV: 120 degrees)
-            0.17,  # Yellow (HSV: 60 degrees)
-            0.0    # Red (HSV: 0 degrees)
+            (0.0, 2.0, 0.0),  # Green
+            (2.0, 2.0, 0.0),  # Yellow
+            (2.0, 0.0, 0.0),  # Red
         ]
-        color_step = 0.01  # Steps between colors
-        current_hue = colors[0]
+        transition_steps = 30  # Number of steps between colors
+        current_step = 0
         
-        logging.info(f"Initial color: {current_hue}")  # Debug log
+        current_color = colors[0]
+        next_color = colors[1]
+        
+        logging.info(f"Initial color: {current_color}")
         
         while not stop_event.is_set():
             try:
                 # Create a new image for each frame
                 image = Image.new("RGB", (width, height), (0, 0, 0))
                 
+                # Calculate current color in transition
+                r = current_color[0] + (next_color[0] - current_color[0]) * current_step / transition_steps
+                g = current_color[1] + (next_color[1] - current_color[1]) * current_step / transition_steps
+                b = current_color[2] + (next_color[2] - current_color[2]) * current_step / transition_steps
+                
                 # Tint the chilli with current color
-                tinted_chilli = tint_image(chilli_icon, current_hue)
+                tinted_chilli = tint_image(chilli_icon, (r, g, b))
                 image.paste(tinted_chilli, (x, y), mask=tinted_chilli)
                 
                 # Update position
@@ -73,19 +72,14 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
                 if y <= 0 or y >= height - chilli_icon.size[1]:
                     dy = -dy
                 
-                # Update color
-                target_color = colors[color_index]
-                if abs(current_hue - target_color) < color_step:
-                    # Move to next color
+                # Update color transition
+                current_step += 1
+                if current_step >= transition_steps:
+                    current_step = 0
                     color_index = (color_index + 1) % len(colors)
-                    target_color = colors[color_index]
-                    logging.info(f"Color transition: {current_hue} -> {target_color}")  # Debug log
-                
-                # Move current_hue towards target_color
-                if current_hue < target_color:
-                    current_hue = min(target_color, current_hue + color_step)
-                else:
-                    current_hue = max(target_color, current_hue - color_step)
+                    current_color = colors[color_index]
+                    next_color = colors[(color_index + 1) % len(colors)]
+                    logging.info(f"Color transition: {current_color} -> {next_color}")
                 
                 # Display the image with lock
                 with display_lock:
