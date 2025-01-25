@@ -32,10 +32,10 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
     try:
         chilli_icon = icons['chilli']
         width, height = display.width, display.height
-        x, y = 0, 0  # Starting position
-        dx, dy = 3, 3  # Slightly faster movement
+        x, y = width//2, height//2  # Start from center
+        dx, dy = 2, 2  # Slower movement
         angle = 0  # Starting angle for rotation
-        rotation_speed = 3  # Faster rotation
+        rotation_speed = 3  # Keep current rotation speed
         
         # Color transition variables
         hue = 0.33  # Start with green (HSV: 120 degrees = 0.33)
@@ -66,19 +66,19 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
                 y += dy
                 
                 # Bounce off edges with padding
-                if x <= x_adjust + edge_padding:
-                    x = x_adjust + edge_padding
-                    dx = abs(dx)  # Ensure we move right
-                elif x >= width - (chilli_icon.size[0] - x_adjust) - edge_padding:
-                    x = width - (chilli_icon.size[0] - x_adjust) - edge_padding
-                    dx = -abs(dx)  # Ensure we move left
+                if x <= edge_padding:  # Left edge
+                    x = edge_padding
+                    dx = abs(dx)  # Move right
+                elif x >= width - edge_padding:  # Right edge
+                    x = width - edge_padding
+                    dx = -abs(dx)  # Move left
                 
-                if y <= y_adjust + edge_padding:
-                    y = y_adjust + edge_padding
-                    dy = abs(dy)  # Ensure we move down
-                elif y >= height - (chilli_icon.size[1] - y_adjust) - edge_padding:
-                    y = height - (chilli_icon.size[1] - y_adjust) - edge_padding
-                    dy = -abs(dy)  # Ensure we move up
+                if y <= edge_padding:  # Top edge
+                    y = edge_padding
+                    dy = abs(dy)  # Move down
+                elif y >= height - edge_padding:  # Bottom edge
+                    y = height - edge_padding
+                    dy = -abs(dy)  # Move up
                 
                 # Update rotation
                 angle = (angle + rotation_speed) % 360
@@ -92,7 +92,7 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
                 with display_lock:
                     display.display(image)
                 
-                time.sleep(0.03)  # Animation speed
+                time.sleep(0.04)  # Slightly slower animation
             except Exception as e:
                 logging.error(f"Error in animation loop: {e}")
                 time.sleep(0.1)
