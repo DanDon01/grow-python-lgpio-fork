@@ -1312,7 +1312,7 @@ def main():
     screensaver_active = False
 
     def handle_button(chip, gpio, level, tick):
-        global last_button_press
+        global last_button_press, screensaver_active, screensaver_stop_event, viewcontroller
         
         index = BUTTONS.index(gpio)
         label = LABELS[index]
@@ -1325,19 +1325,31 @@ def main():
         last_button_press = current_time
         logging.info(f"Button pressed: {label}")
 
-        if label == "A":
-            viewcontroller.button_a()
-        elif label == "B":
-            if not viewcontroller.button_b():
-                if viewcontroller.home:
-                    if alarm.sleeping():
-                        alarm.cancel_sleep()
-                    else:
-                        alarm.sleep()
-        elif label == "X":
-            viewcontroller.button_x()
-        elif label == "Y":
-            viewcontroller.button_y()
+        # If screensaver is active, Y button deactivates it
+        if screensaver_active and label == "Y":
+            screensaver_stop_event.set()
+            screensaver_active = False
+            logging.info("Screensaver disabled")
+            # Return to main view
+            viewcontroller._current_view = 0
+            viewcontroller._current_subview = 0
+            return
+
+        # Only process other buttons if screensaver is not active
+        if not screensaver_active:
+            if label == "A":
+                viewcontroller.button_a()
+            elif label == "B":
+                if not viewcontroller.button_b():
+                    if viewcontroller.home:
+                        if alarm.sleeping():
+                            alarm.cancel_sleep()
+                        else:
+                            alarm.sleep()
+            elif label == "X":
+                viewcontroller.button_x()
+            elif label == "Y":
+                viewcontroller.button_y()
 
     def cleanup():
         global screensaver_thread, screensaver_stop_event

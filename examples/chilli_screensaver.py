@@ -1,11 +1,32 @@
 # This is version 2.0 of the code
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 import time
 import sys
 import os
 from threading import Event, Lock
 import logging
+import colorsys
+
+def tint_image(image, hue):
+    """Tint the image with a specific hue while maintaining its alpha channel."""
+    # Convert hue to RGB (hue ranges from 0 to 1)
+    rgb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
+    
+    # Split the image into bands
+    r, g, b, a = image.split()
+    
+    # Create a new image with the tint color
+    tinted = Image.merge('RGB', (
+        r.point(lambda x: int(x * rgb[0])),
+        g.point(lambda x: int(x * rgb[1])),
+        b.point(lambda x: int(x * rgb[2]))
+    ))
+    
+    # Add back the alpha channel
+    tinted.putalpha(a)
+    
+    return tinted
 
 def draw_chilli_animation(display, icons, stop_event, display_lock):
     """Draw chilli animation on the display."""
@@ -14,14 +35,21 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
         width, height = display.width, display.height
         x, y = 0, 0  # Starting position
         dx, dy = 2, 2  # Movement speed and direction
-
+        
+        # Color transition variables
+        hue = 0.33  # Start with green (HSV: 120 degrees = 0.33)
+        hue_step = 0.001  # Small step for smooth transition
+        
         while not stop_event.is_set():
             try:
                 # Create a new image for each frame
                 image = Image.new("RGB", (width, height), (0, 0, 0))
                 
+                # Tint the chilli with current hue
+                tinted_chilli = tint_image(chilli_icon, hue)
+                
                 # Draw single chilli at current position
-                image.paste(chilli_icon, (x, y), mask=chilli_icon)
+                image.paste(tinted_chilli, (x, y), mask=tinted_chilli)
                 
                 # Update position
                 x += dx
@@ -33,11 +61,16 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
                 if y <= 0 or y >= height - chilli_icon.size[1]:
                     dy = -dy
                 
+                # Update hue (cycle through green -> yellow -> red)
+                hue -= hue_step  # Decrease hue to go from green to red
+                if hue < 0:  # Reset when we reach red
+                    hue = 0.33  # Back to green
+                
                 # Display the image with lock
                 with display_lock:
                     display.display(image)
                 
-                time.sleep(0.03)  # Faster animation
+                time.sleep(0.03)  # Animation speed
             except Exception as e:
                 logging.error(f"Error in animation loop: {e}")
                 time.sleep(0.1)
@@ -63,9 +96,7 @@ if __name__ == "__main__":
         dc=9,
         backlight=12,
         rotation=270,
-        spi_speed_hz=80000000,
-      #  invert=False,
-      #  bgr=True
+        spi_speed_hz=80000000
     )
     display.begin()
     draw_chilli_animation(display, icons, stop_event, display_lock)
