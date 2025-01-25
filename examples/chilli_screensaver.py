@@ -32,6 +32,9 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
     try:
         chilli_icon = icons['chilli']
         width, height = display.width, display.height
+        logging.info(f"Display size: {width}x{height}")  # Debug log
+        logging.info(f"Chilli size: {chilli_icon.size}")  # Debug log
+        
         x, y = width//2, height//2  # Start from center
         dx, dy = 2, 2  # Slower movement
         angle = 0  # Starting angle for rotation
@@ -65,19 +68,19 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
                 x += dx
                 y += dy
                 
-                # Bounce off edges with padding
-                if x <= edge_padding:  # Left edge
-                    x = edge_padding
+                # Bounce off edges with padding, accounting for rotated size
+                if x <= edge_padding + x_adjust:  # Left edge
+                    x = edge_padding + x_adjust
                     dx = abs(dx)  # Move right
-                elif x >= width - edge_padding:  # Right edge
-                    x = width - edge_padding
+                elif x >= width - rot_width + x_adjust - edge_padding:  # Right edge
+                    x = width - rot_width + x_adjust - edge_padding
                     dx = -abs(dx)  # Move left
                 
-                if y <= edge_padding:  # Top edge
-                    y = edge_padding
+                if y <= edge_padding + y_adjust:  # Top edge
+                    y = edge_padding + y_adjust
                     dy = abs(dy)  # Move down
-                elif y >= height - edge_padding:  # Bottom edge
-                    y = height - edge_padding
+                elif y >= height - rot_height + y_adjust - edge_padding:  # Bottom edge
+                    y = height - rot_height + y_adjust - edge_padding
                     dy = -abs(dy)  # Move up
                 
                 # Update rotation
