@@ -1221,13 +1221,13 @@ def main():
     screensaver_active = False
 
     def handle_button(chip, gpio, level, tick):
-    global last_button_press, screensaver_thread, screensaver_active
+        global last_button_press, screensaver_thread, screensaver_active
 
-    index = BUTTONS.index(gpio)
-    label = LABELS[index]
+        index = BUTTONS.index(gpio)
+        label = LABELS[index]
 
-    current_time = time.time()
-    # Debounce: Ignore presses within 0.3 seconds
+        current_time = time.time()
+        # Debounce: Ignore presses within 0.3 seconds
     if current_time - last_button_press < 0.3:
         return
 
