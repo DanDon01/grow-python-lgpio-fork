@@ -1257,6 +1257,9 @@ def write_sensor_data(channels, light):
                 'enabled': channel.enabled,
                 'history': channel.sensor.history
             }
+            logging.info(f"Writing data for channel {channel.channel}: moisture={channel.sensor.moisture}, saturation={channel.sensor.saturation * 100}%")
+    
+    logging.info(f"Light sensor: lux={light.get_lux()}, proximity={light.get_proximity()}")
     
     try:
         with open('sensor_data.json', 'w') as f:
