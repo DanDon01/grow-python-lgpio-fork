@@ -1264,44 +1264,6 @@ def write_sensor_data(channels, light):
         logging.error(f"Failed to write sensor data: {e}")
 
 
-def draw_chilli_animation(display, icons, stop_event, display_lock):
-    """Draw chilli animation on the display."""
-    try:
-        chilli_icon = icons['chilli']
-        width, height = DISPLAY_WIDTH, DISPLAY_HEIGHT
-        x, y = 0, 0  # Starting position
-        dx, dy = 2, 2  # Movement speed and direction
-
-        while not stop_event.is_set():
-            try:
-                # Create a new image for each frame
-                image = Image.new("RGB", (width, height), (0, 0, 0))
-                
-                # Draw single chilli at current position
-                image.paste(chilli_icon, (x, y), mask=chilli_icon)
-                
-                # Update position
-                x += dx
-                y += dy
-                
-                # Bounce off edges
-                if x <= 0 or x >= width - chilli_icon.size[0]:
-                    dx = -dx
-                if y <= 0 or y >= height - chilli_icon.size[1]:
-                    dy = -dy
-                
-                # Display the image with lock
-                with display_lock:
-                    display.display(image)
-                
-                time.sleep(0.03)  # Faster animation
-            except Exception as e:
-                logging.error(f"Error in animation loop: {e}")
-                time.sleep(0.1)
-    except Exception as e:
-        logging.error(f"Error in screensaver animation: {e}")
-
-
 def main():
     global viewcontroller, display, screensaver_thread, screensaver_stop_event
     global last_button_press, screensaver_active, icons
