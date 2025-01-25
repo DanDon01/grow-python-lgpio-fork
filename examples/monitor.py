@@ -400,8 +400,9 @@ class SettingsView(EditView):
 
     def __init__(self, image, options=[]):
         # Add screensaver option to the settings menu
-        options.extend(["Screensaver Settings"])
+        options.extend(["Activate Screensaver", "Back to Settings"])
         super().__init__(image, options)
+        self.current_selection = 0
 
     def render(self):
         self.clear()
@@ -411,14 +412,34 @@ class SettingsView(EditView):
             font=self.font,
             fill=COLOR_WHITE,
         )
-        super().render()
+
+        # Render menu options
+        for i, option in enumerate(self.options):
+            y_position = 25 + i * 20
+            color = COLOR_GREEN if i == self.current_selection else COLOR_WHITE
+            self._draw.text((20, y_position), option, font=self.font, fill=color)
 
     def handle_selection(self, selection):
         """Handle selection in the settings menu."""
-        if selection == "Screensaver Settings":
-            viewcontroller.change_view(ScreensaverSettingsView(self.image))
+        if selection == "Activate Screensaver":
+            logging.info("Starting screensaver...")
+            subprocess.Popen([sys.executable, "chilli_screensaver.py"])  # Start the screensaver
+        elif selection == "Back to Settings":
+            viewcontroller.change_view(SettingsView(self.image))  # Return to main settings menu
         else:
             super().handle_selection(selection)
+
+    def handle_input(self, input_label):
+        """Handle user input for the settings menu."""
+        if input_label == "UP":
+            self.current_selection = (self.current_selection - 1) % len(self.options)
+        elif input_label == "DOWN":
+            self.current_selection = (self.current_selection + 1) % len(self.options)
+        elif input_label == "SELECT":
+            selected_option = self.options[self.current_selection]
+            self.handle_selection(selected_option)
+        self.render()
+
             
 class SettingsView(EditView):
     """Main settings."""
@@ -1003,63 +1024,75 @@ class ViewController:
         return self._current_view == 0 and self._current_subview == 0
 
     def next_subview(self):
+        """Switch to the next subview if the current view is a tuple."""
         view = self.views[self._current_view]
         if isinstance(view, tuple):
             self._current_subview += 1
             self._current_subview %= len(view)
 
     def next_view(self):
+        """Switch to the next main view."""
         if self._current_subview == 0:
             self._current_view += 1
             self._current_view %= len(self.views)
             self._current_subview = 0
 
     def prev_view(self):
+        """Switch to the previous main view."""
         if self._current_subview == 0:
             self._current_view -= 1
             self._current_view %= len(self.views)
             self._current_subview = 0
 
     def get_current_view(self):
+        """Retrieve the currently active view or subview."""
         view = self.views[self._current_view]
         if isinstance(view, tuple):
             view = view[self._current_subview]
-
         return view
 
     @property
     def view(self):
+        """Shortcut to get the current view."""
         return self.get_current_view()
 
     def update(self):
+        """Update the current view."""
         self.view.update()
 
     def render(self):
+        """Render the current view."""
         self.view.render()
 
     def button_a(self):
+        """Handle Button A presses."""
         if not self.view.button_a():
             self.next_view()
 
     def button_b(self):
+        """Handle Button B presses."""
         self.view.button_b()
 
     def button_x(self):
-        if not self.view.button_x():
+        """Handle Button X presses for subview navigation."""
+        if isinstance(self.view, SettingsView):
+            # Special handling for cycling through SettingsView pages
+            self.view.handle_input("NEXT")
+        elif not self.view.button_x():
             self.next_subview()
             return True
         return True
 
     def button_y(self):
+        """Handle Button Y presses."""
         return self.view.button_y()
 
     def change_view(self, new_view):
         """Change to a new view dynamically."""
         self.views.append(new_view)
-        self._current_view = len(self.views) - 1  # Set to the new view
+        self._current_view = len(self.views) - 1  # Switch to the new view
         self._current_subview = 0
         self.render()  # Render the new view
-
 
 class Config:
     def __init__(self):
@@ -1188,54 +1221,31 @@ def main():
     screensaver_active = False
 
     def handle_button(chip, gpio, level, tick):
-        global last_button_press, screensaver_thread, screensaver_stop_event, screensaver_active
+    global last_button_press, screensaver_thread, screensaver_active
 
-        index = BUTTONS.index(gpio)
-        label = LABELS[index]
+    index = BUTTONS.index(gpio)
+    label = LABELS[index]
 
-        current_time = time.time()
-        # Debounce: Ignore presses within 0.3 seconds
-        if current_time - last_button_press < 0.3:
-            return
+    current_time = time.time()
+    # Debounce: Ignore presses within 0.3 seconds
+    if current_time - last_button_press < 0.3:
+        return
 
-        last_button_press = current_time  # Update last press time
-        print(f"Button pressed: {label}")  # Debug
+    last_button_press = current_time  # Update last press time
+    print(f"Button pressed: {label}")  # Debug
 
-        if label == "A":
-            viewcontroller.button_a()
+    if label == "A":
+        viewcontroller.button_a()
+    elif label == "B":
+        if not viewcontroller.button_b():
+            if viewcontroller.home:
+                if alarm.sleeping():
+                    alarm.cancel_sleep()
+                else:
+                    alarm.sleep()
+    elif label == "X":
+        viewcontroller.button_x()
 
-        elif label == "B":
-            if not viewcontroller.button_b():
-                if viewcontroller.home:
-                    if alarm.sleeping():
-                        alarm.cancel_sleep()
-                    else:
-                        alarm.sleep()
-
-        elif label == "X":
-            viewcontroller.button_x()
-
-        elif label == "Y":
-            if screensaver_active:
-                # Stop the screensaver
-                logging.info("Stopping screensaver...")
-                try:
-                    screensaver_thread.terminate()  # Terminate the screensaver process
-                    screensaver_thread.wait()       # Wait for the process to terminate
-                except Exception as e:
-                    logging.error(f"Error stopping screensaver: {e}")
-                screensaver_thread = None
-                screensaver_active = False
-                # Ensure the display is updated after stopping the screensaver
-                with display_lock:
-                    viewcontroller.render()
-                    display.display(image.convert("RGB"))
-            else:
-                # Start the screensaver
-                logging.info("Starting screensaver...")
-                screensaver_stop_event.clear()  # Reset the stop event
-                screensaver_thread = subprocess.Popen([sys.executable, 'chilli_screensaver.py'])
-                screensaver_active = True
 
     def cleanup():
         global screensaver_thread
