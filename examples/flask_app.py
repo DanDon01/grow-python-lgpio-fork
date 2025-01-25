@@ -5,6 +5,10 @@ import json
 app = Flask(__name__)
 CORS(app)  # Enable CORS if needed
 
+@app.route('/')
+def home():
+    return "Flask server is running!"
+
 @app.route('/sensor_data')
 def get_sensor_data():
     try:

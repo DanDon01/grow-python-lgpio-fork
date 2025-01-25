@@ -1237,10 +1237,67 @@ class Config:
         self.set("general", settings)
 
 
+def write_daily_history(data, current_time):
+    """Write daily sensor history to yearly archive file"""
+    year = current_time.year
+    month = current_time.month
+    day = current_time.day
+    
+    # Create directory structure if it doesn't exist
+    history_dir = pathlib.Path('sensor_history')
+    year_dir = history_dir / str(year)
+    month_dir = year_dir / f"{month:02d}"
+    
+    for dir_path in [history_dir, year_dir, month_dir]:
+        dir_path.mkdir(exist_ok=True)
+    
+    # Create daily history file
+    filename = f"sensor_data_{year}-{month:02d}-{day:02d}.json"
+    file_path = month_dir / filename
+    
+    try:
+        # If file exists, load and append, otherwise create new
+        if file_path.exists():
+            with open(file_path, 'r') as f:
+                daily_data = json.load(f)
+                if 'history' not in daily_data:
+                    daily_data['history'] = []
+        else:
+            daily_data = {'history': []}
+        
+        # Add current history to daily file
+        daily_data['history'].extend(data['history'])
+        
+        # Write updated daily history
+        with open(file_path, 'w') as f:
+            json.dump(daily_data, f)
+        logging.info(f"Daily history archived to {file_path}")
+    except Exception as e:
+        logging.error(f"Failed to write daily history: {e}")
+
 def write_sensor_data(channels, light):
-    """Write current sensor data to JSON file for Flask app"""
-    data = {
-        'timestamp': datetime.now().isoformat(),
+    """Write current sensor data to JSON file with history"""
+    current_time = datetime.now()
+    timestamp = current_time.isoformat()
+    
+    # Try to load existing data first
+    try:
+        with open('sensor_data.json', 'r') as f:
+            data = json.load(f)
+            # Initialize history if it doesn't exist
+            if 'history' not in data:
+                data['history'] = []
+    except (FileNotFoundError, json.JSONDecodeError):
+        # Start fresh if file doesn't exist or is invalid
+        data = {
+            'history': [],
+            'sensors': {},
+            'light': {}
+        }
+    
+    # Create current reading
+    current_reading = {
+        'timestamp': timestamp,
         'sensors': {},
         'light': {
             'lux': light.get_lux(),
@@ -1248,18 +1305,32 @@ def write_sensor_data(channels, light):
         }
     }
     
+    # Update current sensor readings
     for channel in channels:
         if channel and channel.sensor and channel.sensor.active:
-            data['sensors'][f'channel{channel.channel}'] = {
+            current_reading['sensors'][f'channel{channel.channel}'] = {
                 'moisture': channel.sensor.moisture,
                 'saturation': channel.sensor.saturation * 100,
                 'alarm': channel.alarm,
-                'enabled': channel.enabled,
-                'history': channel.sensor.history
+                'enabled': channel.enabled
             }
-            logging.info(f"Writing data for channel {channel.channel}: moisture={channel.sensor.moisture}, saturation={channel.sensor.saturation * 100}%")
+            logging.info(f"Channel {channel.channel}: moisture={channel.sensor.moisture}, saturation={channel.sensor.saturation * 100}%")
     
-    logging.info(f"Light sensor: lux={light.get_lux()}, proximity={light.get_proximity()}")
+    # Add current reading to history
+    data['history'].append(current_reading)
+    
+    # Check if we need to archive daily data (when history reaches 24 hours)
+    max_history = 24 * 60 * 60  # 24 hours worth of seconds
+    if len(data['history']) >= max_history:
+        # Archive current history before truncating
+        write_daily_history(data, current_time)
+        # Keep only the most recent hour of data to avoid gaps
+        data['history'] = data['history'][-3600:]  # Keep last hour
+    
+    # Update current readings
+    data['timestamp'] = timestamp
+    data['sensors'] = current_reading['sensors']
+    data['light'] = current_reading['light']
     
     try:
         with open('sensor_data.json', 'w') as f:
@@ -1280,12 +1351,16 @@ def main():
 
     # Start Flask app in a separate thread
     def run_flask():
-        app.run(host='0.0.0.0', port=5000)
-    
+        try:
+            logging.info("Starting Flask server...")
+            app.run(host='0.0.0.0', port=5000)
+            logging.info("Flask server running on port 5000")
+        except Exception as e:
+            logging.error(f"Failed to start Flask server: {e}")
+
     flask_thread = threading.Thread(target=run_flask)
-    flask_thread.daemon = True  # This ensures the Flask thread will stop when the main program stops
+    flask_thread.daemon = True
     flask_thread.start()
-    logging.info("Flask server started on port 5000")
 
     def handle_button(chip, gpio, level, tick):
         global last_button_press, screensaver_active, screensaver_stop_event, viewcontroller
@@ -1506,6 +1581,7 @@ def main():
         viewcontroller = ViewController(views)
 
         # Main loop
+        last_display_update = time.time()
         while True:
             try:
                 # Update channels
@@ -1515,39 +1591,43 @@ def main():
                         if channel.alarm:
                             alarm.trigger()
 
-                # Write sensor data to file every cycle
+                # Write sensor data to file every 1 second instead of waiting for the full display refresh
                 write_sensor_data(channels, light)
 
-                light_level_low = light.get_lux() < config.get_general().get("light_level_low")
-                alarm.update(light_level_low)
-                viewcontroller.update()
+                # Only update display at normal FPS
+                if time.time() - last_display_update >= 1.0 / FPS:
+                    light_level_low = light.get_lux() < config.get_general().get("light_level_low")
+                    alarm.update(light_level_low)
+                    viewcontroller.update()
 
-                with display_lock:
-                    if screensaver_active:
-                        # Skip rendering if screensaver is active
-                        continue
+                    with display_lock:
+                        if screensaver_active:
+                            continue
 
-                    if light_level_low and config.get_general().get("black_screen_when_light_low"):
-                        display.sleep()
-                        display.display(image_blank.convert("RGB"))
-                    else:
-                        viewcontroller.render()
-                        display.wake()
-                        display.display(image.convert("RGB"))
+                        if light_level_low and config.get_general().get("black_screen_when_light_low"):
+                            display.sleep()
+                            display.display(image_blank.convert("RGB"))
+                        else:
+                            viewcontroller.render()
+                            display.wake()
+                            display.display(image.convert("RGB"))
 
-                config.set_general(
-                    {
-                        "alarm_enable": alarm.enabled,
-                        "alarm_interval": alarm.interval,
-                    }
-                )
+                    config.set_general(
+                        {
+                            "alarm_enable": alarm.enabled,
+                            "alarm_interval": alarm.interval,
+                        }
+                    )
 
-                config.save()
-                time.sleep(1.0 / FPS)  # Slower updates
+                    config.save()
+                    last_display_update = time.time()
                 
+                # Small sleep to prevent CPU overload but allow frequent sensor updates
+                time.sleep(0.1)  # 10 times per second
+            
             except Exception as e:
                 logging.error(f"Error in main loop: {e}")
-                time.sleep(1)  # Prevent tight error loop
+                time.sleep(1)
 
     except KeyboardInterrupt:
         print("\nExiting...")
