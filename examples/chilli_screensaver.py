@@ -32,13 +32,17 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
     try:
         chilli_icon = icons['chilli']
         width, height = display.width, display.height
-        logging.info(f"Display size: {width}x{height}")  # Debug log
-        logging.info(f"Chilli size: {chilli_icon.size}")  # Debug log
+        logging.info(f"Display size: {width}x{height}")
+        logging.info(f"Chilli size: {chilli_icon.size}")
         
         x, y = width//2, height//2  # Start from center
-        dx, dy = 2, 2  # Slower movement
+        dx, dy = 1.5, 1.5  # Slower, smoother movement using floats
         angle = 0  # Starting angle for rotation
         rotation_speed = 3  # Keep current rotation speed
+        
+        # Store actual position as floats for smoother movement
+        float_x = float(x)
+        float_y = float(y)
         
         # Color transition variables
         hue = 0.33  # Start with green (HSV: 120 degrees = 0.33)
@@ -61,27 +65,31 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
                 x_adjust = (rot_width - chilli_icon.size[0]) // 2
                 y_adjust = (rot_height - chilli_icon.size[1]) // 2
                 
-                # Draw rotated and tinted chilli
-                image.paste(rotated_chilli, (x - x_adjust, y - y_adjust), mask=rotated_chilli)
+                # Update position using floats for smoother movement
+                float_x += dx
+                float_y += dy
                 
-                # Update position (bouncing)
-                x += dx
-                y += dy
+                # Convert to integers for display
+                x = int(float_x)
+                y = int(float_y)
                 
                 # Bounce off edges with padding, accounting for rotated size
-                if x <= edge_padding + x_adjust:  # Left edge
-                    x = edge_padding + x_adjust
+                if float_x <= edge_padding + x_adjust:  # Left edge
+                    float_x = edge_padding + x_adjust
                     dx = abs(dx)  # Move right
-                elif x >= width - rot_width + x_adjust - edge_padding:  # Right edge
-                    x = width - rot_width + x_adjust - edge_padding
+                elif float_x >= width - rot_width + x_adjust - edge_padding:  # Right edge
+                    float_x = width - rot_width + x_adjust - edge_padding
                     dx = -abs(dx)  # Move left
                 
-                if y <= edge_padding + y_adjust:  # Top edge
-                    y = edge_padding + y_adjust
+                if float_y <= edge_padding + y_adjust:  # Top edge
+                    float_y = edge_padding + y_adjust
                     dy = abs(dy)  # Move down
-                elif y >= height - rot_height + y_adjust - edge_padding:  # Bottom edge
-                    y = height - rot_height + y_adjust - edge_padding
+                elif float_y >= height - rot_height + y_adjust - edge_padding:  # Bottom edge
+                    float_y = height - rot_height + y_adjust - edge_padding
                     dy = -abs(dy)  # Move up
+                
+                # Draw rotated and tinted chilli
+                image.paste(rotated_chilli, (x - x_adjust, y - y_adjust), mask=rotated_chilli)
                 
                 # Update rotation
                 angle = (angle + rotation_speed) % 360
@@ -95,7 +103,7 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
                 with display_lock:
                     display.display(image)
                 
-                time.sleep(0.04)  # Slightly slower animation
+                time.sleep(0.04)  # Keep current animation speed
             except Exception as e:
                 logging.error(f"Error in animation loop: {e}")
                 time.sleep(0.1)
