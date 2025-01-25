@@ -1269,11 +1269,18 @@ def draw_chilli_animation(display, icons, stop_event, display_lock):
 
         while not stop_event.is_set():
             try:
+                # Create a new image for each frame
+                image = Image.new("RGB", (width, height), (0, 0, 0))
+                
+                # Draw chillis on the image
+                for x in range(0, width, chilli_icon.size[0] + 5):
+                    for y in range(0, height, chilli_icon.size[1] + 5):
+                        image.paste(chilli_icon, (x, y), mask=chilli_icon)
+                
+                # Display the image with lock
                 with display_lock:
-                    for x in range(0, width, chilli_icon.size[0] + 5):
-                        for y in range(0, height, chilli_icon.size[1] + 5):
-                            display.image.paste(chilli_icon, (x, y), mask=chilli_icon)
-                    display.display(display.image)
+                    display.display(image)
+                
                 time.sleep(0.2)
             except Exception as e:
                 logging.error(f"Error in animation loop: {e}")
