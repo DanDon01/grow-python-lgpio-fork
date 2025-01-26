@@ -1315,31 +1315,31 @@ def write_sensor_data(channels, light):
         'timestamp': timestamp,
         'sensors': {},
         'light': {
-            'lux': round(light.get_lux(), 2),
-            'proximity': round(light.get_proximity(), 2)
+            'lux': float(f"{light.get_lux():.2f}"),  # Force 2 decimal places
+            'proximity': float(f"{light.get_proximity():.2f}")  # Force 2 decimal places
         }
     }
     
     # Update current sensor readings - only moisture level and status
     for channel in channels:
         if channel and channel.sensor and channel.sensor.active:
-            raw_moisture = round(channel.sensor.moisture, 2)  # Round raw value
+            # Get raw moisture value and format to exactly 2 decimal places
+            raw_value = float(f"{channel.sensor.get_raw_moisture():.2f}")
             
-            # Log min/max values seen
+            # Log min/max values seen (also with 2 decimal places)
             if not hasattr(channel, 'min_moisture'):
-                channel.min_moisture = raw_moisture
-                channel.max_moisture = raw_moisture
+                channel.min_moisture = raw_value
+                channel.max_moisture = raw_value
             else:
-                channel.min_moisture = round(min(channel.min_moisture, raw_moisture), 2)
-                channel.max_moisture = round(max(channel.max_moisture, raw_moisture), 2)
+                channel.min_moisture = float(f"{min(channel.min_moisture, raw_value):.2f}")
+                channel.max_moisture = float(f"{max(channel.max_moisture, raw_value):.2f}")
             
-            logging.info(f"Channel {channel.channel} - Raw: {raw_moisture:.2f} (Min: {channel.min_moisture:.2f}, Max: {channel.max_moisture:.2f})")
+            # Log with exactly 2 decimal places
+            logging.info(f"Channel {channel.channel} - Raw: {raw_value:.2f} (Min: {channel.min_moisture:.2f}, Max: {channel.max_moisture:.2f})")
             
-            normalized_moisture = normalize_moisture(raw_moisture)
-            
+            # Store in JSON with exactly 2 decimal places
             current_reading['sensors'][f'channel{channel.channel}'] = {
-                'moisture': round(normalized_moisture, 2),
-                'raw_moisture': raw_moisture,
+                'moisture': raw_value,  # Already formatted to 2 decimal places
                 'alarm': channel.alarm,
                 'enabled': channel.enabled
             }
