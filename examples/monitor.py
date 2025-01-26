@@ -1298,6 +1298,13 @@ def write_sensor_data(channels, light):
     current_time = datetime.now()
     timestamp = current_time.isoformat()
     
+    # Get and format light sensor values
+    lux_value = float(f"{light.get_lux():.2f}")
+    proximity_value = float(f"{light.get_proximity():.2f}")
+    
+    # Log light sensor values
+    logging.info(f"Light sensor - Lux: {lux_value:.2f}, Proximity: {proximity_value:.2f}")
+    
     try:
         with open('sensor_data.json', 'r') as f:
             data = json.load(f)
@@ -1315,8 +1322,8 @@ def write_sensor_data(channels, light):
         'timestamp': timestamp,
         'sensors': {},
         'light': {
-            'lux': float(f"{light.get_lux():.2f}"),  # Force 2 decimal places
-            'proximity': float(f"{light.get_proximity():.2f}")  # Force 2 decimal places
+            'lux': lux_value,
+            'proximity': proximity_value
         }
     }
     
