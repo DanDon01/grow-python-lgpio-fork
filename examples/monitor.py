@@ -1323,8 +1323,8 @@ def write_sensor_data(channels, light):
     # Update current sensor readings - only moisture level and status
     for channel in channels:
         if channel and channel.sensor and channel.sensor.active:
-            # Get raw moisture value and format to exactly 2 decimal places
-            raw_value = float(f"{channel.sensor.get_raw_moisture():.2f}")
+            # Get moisture value and format to exactly 2 decimal places
+            raw_value = float(f"{channel.sensor.moisture:.2f}")
             
             # Log min/max values seen (also with 2 decimal places)
             if not hasattr(channel, 'min_moisture'):
