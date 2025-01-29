@@ -984,28 +984,21 @@ Dry point: {dry_point}
     def render(self, image, font):
         pass
 
-    def update(self):  # Fix: Add self parameter
-        """Update channel status."""
-        if not self.enabled:
-            return
-        sat = self.sensor.saturation
-        if sat < self.water_level:
-            if self.water():
-                logging.info(
-                    "Watering Channel: {} - rate {:.2f} for {:.2f}sec".format(
-                        self.channel, self.pump_speed, self.pump_time
-                    )
-                )
-        if sat < self.warn_level:
-            if not self.alarm:
-                logging.warning(
-                    "Alarm on Channel: {} - saturation is {:.2f}% (warn level {:.2f}%)".format(
-                        self.channel, sat * 100, self.warn_level * 100
-                    )
-                )
-            self.alarm = True
-        else:
-            self.alarm = False
+    def update(self):
+        """Update channel status and handle automatic watering"""
+        if self.sensor and self.sensor.active:
+            self.sensor.update()
+            
+            # Check moisture level and auto-water if enabled
+            if self.auto_water and self.pump and self.enabled:
+                moisture = self.sensor.moisture
+                if moisture < self.warn_level:  # If moisture is below warning level
+                    logging.info(f"Channel {self.channel} moisture low ({moisture:.2f}), activating pump")
+                    try:
+                        self.pump.run(duration=self.pump_time, speed=self.pump_speed)
+                        logging.info(f"Channel {self.channel} watering complete")
+                    except Exception as e:
+                        logging.error(f"Failed to run pump for channel {self.channel}: {e}")
 
 
 class Alarm(View):
@@ -1612,6 +1605,9 @@ def main():
             ))
 
         viewcontroller = ViewController(views)
+
+        # Initialize Flask app with channel access
+        init_channels(channels)
 
         # Main loop
         last_display_update = time.time()
