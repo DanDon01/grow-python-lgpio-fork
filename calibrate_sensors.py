@@ -3,7 +3,7 @@ from examples.lgpio_moisture import Moisture
 import statistics
 import yaml
 import os
-
+# code
 def get_stable_reading(sensor, samples=10, delay=1):
     """Get a stable reading by averaging multiple samples."""
     readings = []
