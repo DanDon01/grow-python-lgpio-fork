@@ -116,6 +116,39 @@ def update_settings(calibration_data):
     with open(settings_path, 'w') as f:
         yaml.dump(settings, f, default_flow_style=False)
 
+def reset_grow_hat(gpio_handle):
+    """Reset the Mini Grow HAT by cycling GPIO pins."""
+    print("Resetting Mini Grow HAT...")
+    
+    # GPIO pins used by moisture sensors
+    MOISTURE_PINS = [23, 8, 25]  # GPIO 23, 8, 25
+    
+    try:
+        # Set all pins as outputs initially
+        for pin in MOISTURE_PINS:
+            try:
+                GPIO.gpio_free(gpio_handle, pin)
+                time.sleep(0.1)
+                GPIO.gpio_claim_output(gpio_handle, pin, 0)  # Set to LOW
+            except Exception as e:
+                print(f"Pin {pin} setup: {e}")
+        
+        # Wait a moment
+        time.sleep(1)
+        
+        # Free all pins
+        for pin in MOISTURE_PINS:
+            try:
+                GPIO.gpio_free(gpio_handle, pin)
+            except Exception as e:
+                print(f"Pin {pin} free: {e}")
+        
+        time.sleep(2)  # Wait for system to stabilize
+        print("Reset complete")
+        
+    except Exception as e:
+        print(f"Error during reset: {e}")
+
 def main():
     # Set up logging
     logging.basicConfig(
@@ -140,6 +173,9 @@ def main():
         time.sleep(0.1)
         
         logging.info("GPIO initialized successfully")
+        
+        # Reset the HAT before starting calibration
+        reset_grow_hat(h)
         
         # Ask which channels to calibrate
         channels = input("\nEnter channel numbers to calibrate (1 2 3) or press Enter for all: ").strip()
