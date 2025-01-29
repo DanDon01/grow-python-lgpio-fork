@@ -10,22 +10,38 @@ def get_stable_reading(sensor, samples=10, delay=1):
     """Get a stable reading by averaging multiple samples."""
     readings = []
     print("Taking readings", end="")
-    for _ in range(samples):
-        if sensor.active:  # Only take readings if sensor is active
+    
+    # Initial delay to let sensor stabilize
+    time.sleep(2)
+    
+    for i in range(samples):
+        if sensor.active:
             reading = sensor.moisture
-            if reading > 0:  # Only add non-zero readings
+            print(f"\nReading {i+1}: {reading:.2f} Hz")  # More detailed output
+            if reading > 0:
                 readings.append(reading)
-        print(".", end="", flush=True)
+        else:
+            print("\nSensor not active!")
+            break
         time.sleep(delay)
     print("\n")
     
     if not readings:
         print("No valid readings obtained!")
+        print("Debug info:")
+        print(f"Sensor active: {sensor.active}")
+        print(f"Last raw reading: {sensor.moisture}")
         return 0
+    
+    # Remove outliers (optional)
+    if len(readings) >= 4:
+        readings.sort()
+        readings = readings[1:-1]  # Remove highest and lowest
     
     avg = statistics.mean(readings)
     std = statistics.stdev(readings) if len(readings) > 1 else 0
     
+    print(f"Valid readings: {readings}")
     print(f"Average: {avg:.2f} Hz")
     print(f"Standard Deviation: {std:.2f} Hz")
     return avg
@@ -35,15 +51,19 @@ def calibrate_channel(channel, gpio_handle):
     print(f"\n=== Calibrating Channel {channel} ===")
     
     try:
-        # Initialize sensor with delay
+        # Initialize sensor with longer delay
+        print(f"Initializing sensor {channel}...")
         sensor = Moisture(channel, gpio_handle=gpio_handle)
-        time.sleep(0.5)  # Give sensor time to initialize
+        time.sleep(2)  # Increased delay
         
         if not sensor.active:
             print(f"Failed to initialize sensor {channel}")
             return None
         
+        print(f"Sensor {channel} initialized successfully")
+        
         input(f"\nEnsure sensor {channel} is completely DRY, then press Enter...")
+        print("Starting dry readings...")
         dry_reading = get_stable_reading(sensor)
         
         if dry_reading == 0:
@@ -51,6 +71,8 @@ def calibrate_channel(channel, gpio_handle):
             return None
             
         input(f"\nNow place sensor {channel} in WET soil or water, then press Enter...")
+        print("Starting wet readings...")
+        time.sleep(2)  # Add delay after submerging
         wet_reading = get_stable_reading(sensor)
         
         if wet_reading == 0:
@@ -64,6 +86,7 @@ def calibrate_channel(channel, gpio_handle):
         
     except Exception as e:
         print(f"Error calibrating channel {channel}: {e}")
+        logging.error(f"Detailed error: {str(e)}", exc_info=True)
         return None
 
 def update_settings(calibration_data):
