@@ -1,4 +1,5 @@
 import time
+import lgpio as GPIO
 from examples.lgpio_moisture import Moisture
 import statistics
 import yaml
@@ -26,10 +27,10 @@ def get_stable_reading(sensor, samples=10, delay=1):
     print(f"Standard Deviation: {std:.2f} Hz")
     return avg
 
-def calibrate_channel(channel):
+def calibrate_channel(channel, gpio_handle):
     """Calibrate a single channel."""
     print(f"\n=== Calibrating Channel {channel} ===")
-    sensor = Moisture(channel)
+    sensor = Moisture(channel, gpio_handle=gpio_handle)
     
     # Wait for sensor to initialize
     time.sleep(2)
@@ -79,6 +80,9 @@ def main():
     calibration_data = {}
     
     try:
+        # Initialize GPIO
+        h = GPIO.gpiochip_open(0)
+        
         # Ask which channels to calibrate
         channels = input("\nEnter channel numbers to calibrate (1 2 3) or press Enter for all: ").strip()
         channels = [1, 2, 3] if not channels else [int(c) for c in channels.split()]
@@ -88,7 +92,7 @@ def main():
                 print(f"Invalid channel {channel}, skipping...")
                 continue
                 
-            calibration_data[channel] = calibrate_channel(channel)
+            calibration_data[channel] = calibrate_channel(channel, h)
         
         # Show results
         print("\n=== Calibration Results ===")
@@ -109,6 +113,11 @@ def main():
     except Exception as e:
         print(f"\nError during calibration: {e}")
     finally:
+        # Clean up GPIO
+        try:
+            GPIO.gpiochip_close(h)
+        except:
+            pass
         print("\nCalibration complete.")
 
 if __name__ == "__main__":
