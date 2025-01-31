@@ -1005,25 +1005,18 @@ Dry point: {dry_point}
             # Set alarm if moisture is below warning level and we have a valid reading
             if self.enabled and moisture > 0:  # Only trigger alarm if channel is enabled and reading is valid
                 previous_alarm = self.alarm  # Store previous alarm state
-                self.alarm = moisture < self.warn_level
+                should_alarm = moisture < self.warn_level
+                
+                # Debug logging
+                logging.info(f"Channel {self.channel} - Moisture: {moisture:.2f}, Warn Level: {self.warn_level}, Should Alarm: {should_alarm}")
+                
+                self.alarm = should_alarm
                 
                 # Log alarm state changes
                 if self.alarm and not previous_alarm:
                     logging.info(f"Channel {self.channel} alarm ACTIVATED - moisture ({moisture:.2f}) below warn level ({self.warn_level})")
                 elif not self.alarm and previous_alarm:
                     logging.info(f"Channel {self.channel} alarm CLEARED - moisture ({moisture:.2f}) above warn level ({self.warn_level})")
-                elif self.alarm:
-                    logging.debug(f"Channel {self.channel} alarm CONTINUING - moisture ({moisture:.2f}) still below warn level ({self.warn_level})")
-            
-            # Check moisture level and auto-water if enabled
-            if self.auto_water and self.pump and self.enabled:
-                if moisture < self.warn_level:  # If moisture is below warning level
-                    logging.info(f"Channel {self.channel} moisture low ({moisture:.2f}), activating pump")
-                    try:
-                        self.pump.dose(speed=self.pump_speed, duration=self.pump_time, blocking=False)
-                        logging.info(f"Channel {self.channel} watering complete")
-                    except Exception as e:
-                        logging.error(f"Failed to run pump for channel {self.channel}: {e}")
 
 
 class Alarm(View):
@@ -1049,11 +1042,16 @@ class Alarm(View):
         self._channels = channels
 
     def update(self, lights_out=False):
+        # Debug logging for alarm state
+        logging.info(f"Alarm update - Enabled: {self.enabled}, Lights out: {lights_out}, Triggered: {self._triggered}")
+        
         # Check sleep timer
         if self._sleep_until is not None:
             if self._sleep_until > time.time():
+                logging.debug("Alarm sleeping")
                 return
             self._sleep_until = None
+            logging.debug("Alarm sleep ended")
 
         # Check if any initialized channel has an alarm
         active_alarms = [
@@ -1061,14 +1059,12 @@ class Alarm(View):
             if channel.alarm and channel._initialized and channel.enabled
         ]
 
-        # Log alarm states for debugging
-        for channel in active_alarms:
-            logging.debug(f"Channel {channel.channel} has active alarm")
-
-        # If any channel has an alarm, set triggered
+        # Log alarm states
         if active_alarms:
+            logging.info(f"Active alarms on channels: {[c.channel for c in active_alarms]}")
             self._triggered = True
-            logging.debug(f"Alarm triggered by channels: {[c.channel for c in active_alarms]}")
+        else:
+            logging.debug("No active alarms")
 
         # Handle alarm beeping
         if (
@@ -1693,6 +1689,7 @@ def main():
                     if channel and channel.sensor and channel.sensor.active:
                         channel.update()
                         if channel.alarm:
+                            logging.info(f"Channel {channel.channel} has alarm, triggering alarm system")
                             alarm.trigger()
 
                 # Write sensor data to file every 1 second instead of waiting for the full display refresh
@@ -1701,6 +1698,7 @@ def main():
                 # Only update display at normal FPS
                 if time.time() - last_display_update >= 1.0 / FPS:
                     light_level_low = light.get_lux() < config.get_general().get("light_level_low")
+                    logging.debug(f"Light level low: {light_level_low}")
                     alarm.update(light_level_low)
                     viewcontroller.update()
 
