@@ -12,6 +12,8 @@ import os
 import json
 from datetime import datetime
 import signal
+from werkzeug.serving import is_running_from_reloader
+from flask import request
 
 import ltr559
 import lgpio as GPIO  # Change the import to lgpio
@@ -1236,6 +1238,7 @@ class Config:
                 raise yaml.parser.ParserError(
                     "Error parsing settings file: {} ({})".format(settings_file, e))
                 
+                
 
     def save(self, settings_file="settings.yml"):
         if len(sys.argv) > 1:
@@ -1410,6 +1413,53 @@ def write_sensor_data(channels, light):
         logging.error(f"Failed to write sensor data: {e}")
 
 
+def cleanup():
+    """Clean up GPIO and other resources"""
+    logging.info("Cleaning up...")
+    try:
+        # Stop the screensaver if running
+        if screensaver_stop_event:
+            screensaver_stop_event.set()
+        if screensaver_thread and screensaver_thread.is_alive():
+            screensaver_thread.join(timeout=1.0)
+        
+        # Clear and turn off display
+        try:
+            if display:
+                blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
+                with display_lock:
+                    display.display(blank_image)
+                    display.sleep()
+        except Exception as e:
+            logging.error(f"Display cleanup error: {e}")
+        
+        # Clean up GPIO for all channels
+        if 'channels' in globals():
+            for channel in channels:
+                if channel.pump:
+                    channel.pump.dose(0, 0.1)  # Ensure pumps are off
+        
+        # Close GPIO handle
+        try:
+            if 'h' in globals():
+                GPIO.gpiochip_close(h)
+        except Exception as e:
+            logging.error(f"GPIO cleanup error: {e}")
+        
+        logging.info("Cleanup complete")
+        
+        # Force exit without trying to stop Flask
+        os._exit(0)
+        
+    except Exception as e:
+        logging.error(f"Error during cleanup: {e}")
+        os._exit(1)
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals"""
+    logging.info(f"Received signal {signum}, initiating shutdown...")
+    cleanup()
+
 def main():
     global viewcontroller, display, screensaver_thread, screensaver_stop_event
     global last_button_press, screensaver_active, icons
@@ -1478,39 +1528,7 @@ def main():
         except Exception as e:
             logging.error(f"Button handler error: {e}")
 
-    def cleanup():
-        """Enhanced cleanup function"""
-        global screensaver_thread, screensaver_stop_event, display
-        logging.info("Cleaning up...")
-        
-        # Stop screensaver
-        if screensaver_stop_event:
-            screensaver_stop_event.set()
-        if screensaver_thread and screensaver_thread.is_alive():
-            screensaver_thread.join(timeout=1.0)
-        
-        # Clear and turn off display
-        try:
-            if display:
-                blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
-                with display_lock:
-                    display.display(blank_image)
-                    display.sleep()
-        except Exception as e:
-            logging.error(f"Display cleanup error: {e}")
-        
-        # Close GPIO
-        try:
-            GPIO.gpiochip_close(h)
-        except Exception as e:
-            logging.error(f"GPIO cleanup error: {e}")
-
-    # Set up signal handlers for graceful shutdown
-    def signal_handler(signum, frame):
-        logging.info("Shutting down gracefully...")
-        cleanup()
-        sys.exit(0)
-
+    # Set up signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
