@@ -1,35 +1,35 @@
 channel1:
   auto_water: false
-  dry_point: 27.0
+  dry_point: 13.2
   enabled: true
   pump_speed: 0.5
   pump_time: 0.5
   warn_level: 0.2
   water_level: 0.15
   watering_delay: 60
-  wet_point: 0.7
+  wet_point: 2.4
 channel2:
   auto_water: false
-  dry_point: 27.0
+  dry_point: 14.4
   enabled: true
   pump_speed: 0.5
   pump_time: 0.5
   warn_level: 0.5
   water_level: 0.4
   watering_delay: 60
-  wet_point: 0.7
+  wet_point: 4.4
 channel3:
   auto_water: false
-  dry_point: 27.0
+  dry_point: 12.3
   enabled: true
   pump_speed: 0.5
   pump_time: 0.5
   warn_level: 0.4
   water_level: 0.3
   watering_delay: 60
-  wet_point: 0.7
+  wet_point: 1.2
 general:
   alarm_enable: true
-  alarm_interval: 2
-  light_level_low: 4.0
+  alarm_interval: 1
   black_screen_when_light_low: false
+  light_level_low: 4.0
