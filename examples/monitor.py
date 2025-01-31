@@ -1237,7 +1237,7 @@ class Config:
             except yaml.parser.ParserError as e:
                 raise yaml.parser.ParserError(
                     "Error parsing settings file: {} ({})".format(settings_file, e))
-                )
+                
 
     def save(self, settings_file="settings.yml"):
         if len(sys.argv) > 1:
