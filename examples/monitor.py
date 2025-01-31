@@ -647,9 +647,18 @@ class DetailView(ChannelView):
             # Draw alarm line - calculate based on the same scale as the color indicator
             moisture_range = self.channel._dry_point - self.channel._wet_point
             if moisture_range > 0:
-                # Invert the warn_level to match the display scale (like in indicator_color)
+                # Debug the values used in calculation
+                logging.info(f"Channel {self.channel.channel} alarm line calculation:")
+                logging.info(f"  - warn_level: {self.channel.warn_level}")
+                logging.info(f"  - dry_point: {self.channel._dry_point}")
+                logging.info(f"  - wet_point: {self.channel._wet_point}")
+                logging.info(f"  - moisture_range: {moisture_range}")
+                
                 normalized_warn = 1.0 - (self.channel.warn_level / 100.0)
+                logging.info(f"  - normalized_warn: {normalized_warn}")
+                
                 alarm_line = int(normalized_warn * graph_height)
+                logging.info(f"  - alarm_line position: {alarm_line} (graph_height: {graph_height})")
 
                 r = 255
                 if self.channel.alarm:
