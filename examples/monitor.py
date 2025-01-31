@@ -644,30 +644,34 @@ class DetailView(ChannelView):
                 x = graph_x + graph_width - x - 1
                 self._draw.rectangle((x, graph_y + graph_height - h, x + 1, graph_y + graph_height), color)
 
-            # Draw alarm line
-            alarm_line = int(((self.channel.warn_level - self.channel._wet_point) / 
-                             (self.channel._dry_point - self.channel._wet_point)) * graph_height)
+            # Draw alarm line - invert the calculation since lower numbers = wetter
+            moisture_range = self.channel._dry_point - self.channel._wet_point
+            if moisture_range > 0:
+                # Invert the normalization since lower numbers = wetter
+                normalized_warn = (self.channel._dry_point - self.channel.warn_level) / moisture_range
+                alarm_line = int((1.0 - normalized_warn) * graph_height)  # Invert for display
 
-            r = 255
-            if self.channel.alarm:
-                r = int(((math.sin(time.time() * 3 * math.pi) + 1.0) / 2.0) * 128) + 127
+                r = 255
+                if self.channel.alarm:
+                    r = int(((math.sin(time.time() * 3 * math.pi) + 1.0) / 2.0) * 128) + 127)
 
-            self._draw.rectangle(
-                (
-                    0,
-                    graph_height + 8 - alarm_line,
-                    DISPLAY_WIDTH - 40,
-                    graph_height + 8 - alarm_line,
-                ),
-                (r, 0, 0),
-            )
+                # Draw the line across the full width
+                self._draw.rectangle(
+                    (
+                        graph_x,
+                        graph_y + graph_height - alarm_line,
+                        graph_x + graph_width,
+                        graph_y + graph_height - alarm_line,
+                    ),
+                    (r, 0, 0),
+                )
 
-            # Render the alarm icon
-            self.icon(
-                icon_alarm,
-                (DISPLAY_WIDTH - 40, graph_height + 8 - alarm_line - 10),
-                (r, 0, 0),
-            )
+                # Draw the alarm icon
+                self.icon(
+                    icon_alarm,
+                    (graph_x + graph_width + 5, graph_y + graph_height - alarm_line - 10),
+                    (r, 0, 0),
+                )
 
         # Channel icons
         x_positions = [40, 72, 104]
