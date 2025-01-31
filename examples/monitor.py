@@ -644,8 +644,10 @@ class DetailView(ChannelView):
                 x = graph_x + graph_width - x - 1
                 self._draw.rectangle((x, graph_y + graph_height - h, x + 1, graph_y + graph_height), color)
 
-            # Draw the alarm line
-            alarm_line = int(self.channel.warn_level * graph_height)
+            # Draw alarm line
+            alarm_line = int(((self.channel.warn_level - self.channel._wet_point) / 
+                             (self.channel._dry_point - self.channel._wet_point)) * graph_height)
+
             r = 255
             if self.channel.alarm:
                 r = int(((math.sin(time.time() * 3 * math.pi) + 1.0) / 2.0) * 128) + 127
@@ -655,15 +657,6 @@ class DetailView(ChannelView):
                     0,
                     graph_height + 8 - alarm_line,
                     DISPLAY_WIDTH - 40,
-                    graph_height + 8 - alarm_line,
-                ),
-                (r, 0, 0),
-            )
-            self._draw.rectangle(
-                (
-                    DISPLAY_WIDTH - 20,
-                    graph_height + 8 - alarm_line,
-                    DISPLAY_WIDTH,
                     graph_height + 8 - alarm_line,
                 ),
                 (r, 0, 0),
