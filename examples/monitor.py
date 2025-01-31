@@ -864,6 +864,9 @@ class Channel:
         self.alarm = False
         self.title = f"Channel {display_channel}" if title is None else title
         self._gpio_handle = gpio_handle
+        self._initialized = False  # Add this flag
+        self._startup_readings = []  # Add this for initial readings
+        self._startup_count = 5  # Number of readings to collect before activating alarms
 
     def initialize(self):
         """Initialize sensor and pump after GPIO is properly set up"""
@@ -988,8 +991,19 @@ Dry point: {dry_point}
             # Get current moisture level
             moisture = self.sensor.moisture
             
-            # Set alarm if moisture is below warning level
-            if self.enabled:  # Only trigger alarm if channel is enabled
+            # During startup, collect readings before enabling alarms
+            if not self._initialized:
+                if moisture > 0:  # Only add valid readings
+                    self._startup_readings.append(moisture)
+                    if len(self._startup_readings) >= self._startup_count:
+                        # Use average of startup readings
+                        avg_moisture = sum(self._startup_readings) / len(self._startup_readings)
+                        logging.info(f"Channel {self.channel} initialized with average moisture: {avg_moisture:.2f}")
+                        self._initialized = True
+                return  # Skip alarm checks during initialization
+            
+            # Set alarm if moisture is below warning level and we have a valid reading
+            if self.enabled and moisture > 0:  # Only trigger alarm if channel is enabled and reading is valid
                 previous_alarm = self.alarm  # Store previous alarm state
                 self.alarm = moisture < self.warn_level
                 
@@ -999,7 +1013,7 @@ Dry point: {dry_point}
                 elif not self.alarm and previous_alarm:
                     logging.info(f"Channel {self.channel} alarm CLEARED - moisture ({moisture:.2f}) above warn level ({self.warn_level})")
                 elif self.alarm:
-                    logging.info(f"Channel {self.channel} alarm CONTINUING - moisture ({moisture:.2f}) still below warn level ({self.warn_level})")
+                    logging.debug(f"Channel {self.channel} alarm CONTINUING - moisture ({moisture:.2f}) still below warn level ({self.warn_level})")
             
             # Check moisture level and auto-water if enabled
             if self.auto_water and self.pump and self.enabled:
@@ -1041,14 +1055,20 @@ class Alarm(View):
                 return
             self._sleep_until = None
 
+        # Check if any initialized channel has an alarm
+        active_alarms = [
+            channel for channel in self._channels 
+            if channel.alarm and channel._initialized and channel.enabled
+        ]
+
         # Log alarm states for debugging
-        for channel in self._channels:
-            if channel.alarm:
-                logging.debug(f"Channel {channel.channel} has active alarm")
+        for channel in active_alarms:
+            logging.debug(f"Channel {channel.channel} has active alarm")
 
         # If any channel has an alarm, set triggered
-        if any(channel.alarm for channel in self._channels):
+        if active_alarms:
             self._triggered = True
+            logging.debug(f"Alarm triggered by channels: {[c.channel for c in active_alarms]}")
 
         # Handle alarm beeping
         if (
@@ -1217,6 +1237,7 @@ class Config:
             except yaml.parser.ParserError as e:
                 raise yaml.parser.ParserError(
                     "Error parsing settings file: {} ({})".format(settings_file, e))
+                )
 
     def save(self, settings_file="settings.yml"):
         if len(sys.argv) > 1:
