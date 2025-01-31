@@ -990,9 +990,16 @@ Dry point: {dry_point}
             
             # Set alarm if moisture is below warning level
             if self.enabled:  # Only trigger alarm if channel is enabled
+                previous_alarm = self.alarm  # Store previous alarm state
                 self.alarm = moisture < self.warn_level
-                if self.alarm:
-                    logging.info(f"Channel {self.channel} alarm triggered - moisture ({moisture:.2f}) below warn level ({self.warn_level})")
+                
+                # Log alarm state changes
+                if self.alarm and not previous_alarm:
+                    logging.info(f"Channel {self.channel} alarm ACTIVATED - moisture ({moisture:.2f}) below warn level ({self.warn_level})")
+                elif not self.alarm and previous_alarm:
+                    logging.info(f"Channel {self.channel} alarm CLEARED - moisture ({moisture:.2f}) above warn level ({self.warn_level})")
+                elif self.alarm:
+                    logging.info(f"Channel {self.channel} alarm CONTINUING - moisture ({moisture:.2f}) still below warn level ({self.warn_level})")
             
             # Check moisture level and auto-water if enabled
             if self.auto_water and self.pump and self.enabled:
@@ -1014,6 +1021,7 @@ class Alarm(View):
         self._triggered = False
         self._time_last_beep = time.time()
         self._sleep_until = None
+        self._channels = []  # Add this to store channel references
 
         View.__init__(self, image)
 
@@ -1022,18 +1030,34 @@ class Alarm(View):
             self.enabled = config.get("alarm_enable", self.enabled)
             self.interval = config.get("alarm_interval", self.interval)
 
+    def set_channels(self, channels):
+        """Set the channels to monitor for alarms"""
+        self._channels = channels
+
     def update(self, lights_out=False):
+        # Check sleep timer
         if self._sleep_until is not None:
             if self._sleep_until > time.time():
                 return
             self._sleep_until = None
 
+        # Log alarm states for debugging
+        for channel in self._channels:
+            if channel.alarm:
+                logging.debug(f"Channel {channel.channel} has active alarm")
+
+        # If any channel has an alarm, set triggered
+        if any(channel.alarm for channel in self._channels):
+            self._triggered = True
+
+        # Handle alarm beeping
         if (
             self.enabled
             and not lights_out
             and self._triggered
             and time.time() - self._time_last_beep > self.interval
         ):
+            logging.info("Triggering alarm beeps")
             self.piezo.beep(self.beep_frequency, 0.1, blocking=False)
             threading.Timer(
                 0.3,
@@ -1048,7 +1072,6 @@ class Alarm(View):
                 kwargs={"blocking": False},
             ).start()
             self._time_last_beep = time.time()
-
             self._triggered = False
 
     def render(self, position=(0, 0)):
@@ -1340,9 +1363,6 @@ def write_sensor_data(channels, light):
                 channel.min_moisture = float(f"{min(channel.min_moisture, raw_value):.2f}")
                 channel.max_moisture = float(f"{max(channel.max_moisture, raw_value):.2f}")
             
-            # Log with exactly 2 decimal places
-            logging.info(f"Channel {channel.channel} - Raw: {raw_value:.2f} (Min: {channel.min_moisture:.2f}, Max: {channel.max_moisture:.2f})")
-            
             # Store in JSON with exactly 2 decimal places
             current_reading['sensors'][f'channel{channel.channel}'] = {
                 'moisture': raw_value,  # Already formatted to 2 decimal places
@@ -1584,6 +1604,7 @@ def main():
         # Update channels and alarm from config
         for channel in channels:
             channel.update_from_yml(config.get_channel(channel.channel))
+        alarm.set_channels(channels)
         alarm.update_from_yml(config.get_general())
 
         # Print current configuration
