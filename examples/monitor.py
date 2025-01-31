@@ -1002,21 +1002,24 @@ Dry point: {dry_point}
                         self._initialized = True
                 return  # Skip alarm checks during initialization
             
-            # Set alarm if moisture is above warning level and we have a valid reading
+            # Set alarm if moisture is below warning level and we have a valid reading
             if self.enabled and moisture > 0:  # Only trigger alarm if channel is enabled and reading is valid
                 previous_alarm = self.alarm  # Store previous alarm state
-                should_alarm = moisture > self.warn_level * 100  # Convert warn_level to same scale as moisture
+                
+                # Convert moisture to 0-1 scale for comparison with warn_level
+                normalized_moisture = moisture / 100.0
+                should_alarm = normalized_moisture < self.warn_level
                 
                 # Debug logging
-                logging.info(f"Channel {self.channel} - Moisture: {moisture:.2f}, Warn Level: {self.warn_level*100:.2f}, Should Alarm: {should_alarm}")
+                logging.info(f"Channel {self.channel} - Moisture: {moisture:.2f} ({normalized_moisture:.2f}), Warn Level: {self.warn_level:.2f}, Should Alarm: {should_alarm}")
                 
                 self.alarm = should_alarm
                 
                 # Log alarm state changes
                 if self.alarm and not previous_alarm:
-                    logging.info(f"Channel {self.channel} alarm ACTIVATED - moisture ({moisture:.2f}) above warn level ({self.warn_level*100:.2f})")
+                    logging.info(f"Channel {self.channel} alarm ACTIVATED - moisture ({moisture:.2f}) below warn level ({self.warn_level*100:.2f})")
                 elif not self.alarm and previous_alarm:
-                    logging.info(f"Channel {self.channel} alarm CLEARED - moisture ({moisture:.2f}) below warn level ({self.warn_level*100:.2f})")
+                    logging.info(f"Channel {self.channel} alarm CLEARED - moisture ({moisture:.2f}) above warn level ({self.warn_level*100:.2f})")
 
 
 class Alarm(View):
