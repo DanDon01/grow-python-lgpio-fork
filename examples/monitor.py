@@ -28,7 +28,7 @@ print("Imported draw_chilli_animation from:", draw_chilli_animation.__module__)
 from threading import Thread
 from threading import Event
 from threading import Lock
-from flask_app import app
+from flask_app import app, init_channels
 
 # Global variables
 viewcontroller = None
