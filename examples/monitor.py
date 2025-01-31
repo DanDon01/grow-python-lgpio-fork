@@ -653,7 +653,7 @@ class DetailView(ChannelView):
 
                 r = 255
                 if self.channel.alarm:
-                    r = int(((math.sin(time.time() * 3 * math.pi) + 1.0) / 2.0) * 128) + 127)
+                    r = int((((math.sin(time.time() * 3 * math.pi) + 1.0) / 2.0) * 128) + 127)
 
                 # Draw the line across the full width
                 self._draw.rectangle(
