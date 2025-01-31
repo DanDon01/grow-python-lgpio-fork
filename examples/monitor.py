@@ -985,7 +985,8 @@ Dry point: {dry_point}
     def update(self):
         """Update channel status and handle automatic watering"""
         if self.sensor and self.sensor.active:
-            self.sensor.update()
+            # Remove sensor.update() since it doesn't exist
+            # Instead, moisture is read automatically via the event handler
             
             # Check moisture level and auto-water if enabled
             if self.auto_water and self.pump and self.enabled:
@@ -993,7 +994,7 @@ Dry point: {dry_point}
                 if moisture < self.warn_level:  # If moisture is below warning level
                     logging.info(f"Channel {self.channel} moisture low ({moisture:.2f}), activating pump")
                     try:
-                        self.pump.run(duration=self.pump_time, speed=self.pump_speed)
+                        self.pump.dose(speed=self.pump_speed, duration=self.pump_time, blocking=False)
                         logging.info(f"Channel {self.channel} watering complete")
                     except Exception as e:
                         logging.error(f"Failed to run pump for channel {self.channel}: {e}")
