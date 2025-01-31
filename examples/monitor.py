@@ -228,9 +228,7 @@ class View:
 
 class MainView(View):
     """Main overview.
-
     Displays three channels and alarm indicator/snooze.
-
     """
 
     def __init__(self, image, channels=None, alarm=None):
@@ -1291,12 +1289,14 @@ def write_sensor_data(channels, light):
     current_time = datetime.now()
     timestamp = current_time.isoformat()
     
-    # Get and format light sensor values
-    lux_value = float(f"{light.get_lux():.2f}")
-    proximity_value = float(f"{light.get_proximity():.2f}")
-    
-    # Log light sensor values
-    logging.info(f"Light sensor - Lux: {lux_value:.2f}, Proximity: {proximity_value:.2f}")
+    # Get and format light sensor values with error handling
+    try:
+        lux_value = float(f"{light.get_lux():.2f}")
+        proximity_value = float(f"{light.get_proximity():.2f}")
+    except Exception as e:
+        logging.error(f"Light sensor read error: {e}")
+        lux_value = 0.0
+        proximity_value = 0.0
     
     try:
         with open('sensor_data.json', 'r') as f:
@@ -1391,53 +1391,74 @@ def main():
     def handle_button(chip, gpio, level, tick):
         global last_button_press, screensaver_active, screensaver_stop_event, viewcontroller
         
-        index = BUTTONS.index(gpio)
-        label = LABELS[index]
+        try:
+            # Improved debouncing with millisecond precision
+            current_time = time.time()
+            if current_time - last_button_press < 0.3:
+                return
 
-        current_time = time.time()
-        # Debounce: Ignore presses within 0.3 seconds
-        if current_time - last_button_press < 0.3:
-            return
+            index = BUTTONS.index(gpio)
+            label = LABELS[index]
 
-        last_button_press = current_time
-        logging.info(f"Button pressed: {label}")
+            last_button_press = current_time
+            logging.info(f"Button pressed: {label}")
 
-        # If screensaver is active, Y button deactivates it
-        if screensaver_active and label == "Y":
-            screensaver_stop_event.set()
-            screensaver_active = False
-            logging.info("Screensaver disabled")
-            # Return to main view
-            viewcontroller._current_view = 0
-            viewcontroller._current_subview = 0
-            return
+            # Add error handling around button actions
+            try:
+                if screensaver_active and label == "Y":
+                    screensaver_stop_event.set()
+                    screensaver_active = False
+                    logging.info("Screensaver disabled")
+                    viewcontroller._current_view = 0
+                    viewcontroller._current_subview = 0
+                    return
 
-        # Only process other buttons if screensaver is not active
-        if not screensaver_active:
-            if label == "A":
-                viewcontroller.button_a()
-            elif label == "B":
-                if not viewcontroller.button_b():
-                    if viewcontroller.home:
-                        if alarm.sleeping():
-                            alarm.cancel_sleep()
-                        else:
-                            alarm.sleep()
-            elif label == "X":
-                viewcontroller.button_x()
-            elif label == "Y":
-                viewcontroller.button_y()
+                if not screensaver_active:
+                    if label == "A":
+                        viewcontroller.button_a()
+                    elif label == "B":
+                        if not viewcontroller.button_b():
+                            if viewcontroller.home:
+                                if alarm.sleeping():
+                                    alarm.cancel_sleep()
+                                else:
+                                    alarm.sleep()
+                    elif label == "X":
+                        viewcontroller.button_x()
+                    elif label == "Y":
+                        viewcontroller.button_y()
+            except Exception as e:
+                logging.error(f"Error handling button {label}: {e}")
+                
+        except Exception as e:
+            logging.error(f"Button handler error: {e}")
 
     def cleanup():
-        global screensaver_thread, screensaver_stop_event
+        """Enhanced cleanup function"""
+        global screensaver_thread, screensaver_stop_event, display
         logging.info("Cleaning up...")
-        screensaver_stop_event.set()
-        if screensaver_thread is not None and screensaver_thread.is_alive():
+        
+        # Stop screensaver
+        if screensaver_stop_event:
+            screensaver_stop_event.set()
+        if screensaver_thread and screensaver_thread.is_alive():
             screensaver_thread.join(timeout=1.0)
+        
+        # Clear and turn off display
+        try:
+            if display:
+                blank_image = Image.new("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
+                with display_lock:
+                    display.display(blank_image)
+                    display.sleep()
+        except Exception as e:
+            logging.error(f"Display cleanup error: {e}")
+        
+        # Close GPIO
         try:
             GPIO.gpiochip_close(h)
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"GPIO cleanup error: {e}")
 
     # Set up signal handlers for graceful shutdown
     def signal_handler(signum, frame):
@@ -1494,8 +1515,14 @@ def main():
         logging.info("Display cleared with blank image")
 
         # Set up light sensor
-        light = ltr559.LTR559()
-        logging.info("Light sensor initialized")
+        try:
+            light = ltr559.LTR559()
+            # Test the sensor
+            _ = light.get_lux()
+            logging.info("Light sensor initialized successfully")
+        except Exception as e:
+            logging.error(f"Light sensor initialization failed: {e}")
+            light = None
 
         # Set up our canvas and prepare for drawing
         image = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
@@ -1659,15 +1686,12 @@ def main():
                 time.sleep(1)
 
     except KeyboardInterrupt:
-        print("\nExiting...")
+        logging.info("Received keyboard interrupt, shutting down...")
     except Exception as e:
-        logging.error(f"Fatal error: {e}")
+        logging.error(f"Fatal error in main loop: {e}")
+        raise
     finally:
-        print("Cleaning up...")
-        try:
-            GPIO.gpiochip_close(h)
-        except:
-            pass
+        cleanup()
 
 if __name__ == "__main__":
     # Change logging level to INFO - this will hide DEBUG messages

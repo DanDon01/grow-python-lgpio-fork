@@ -1,3 +1,10 @@
+# Run this script to calibrate the moisture sensors on the Mini Grow HAT.
+# The script will guide you through the calibration process for each sensor.
+# You will need to provide a dry environment and a wet environment for calibration.
+# The script will then save the calibration values to settings.yml.
+# Run this script with the following command:
+# python3 calibrate_sensors.py
+
 import time
 import lgpio as GPIO
 from examples.lgpio_moisture import Moisture

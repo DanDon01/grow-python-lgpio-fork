@@ -41,7 +41,7 @@ COLORS = [
     ("Black", (0, 0, 0)),
     ("White", (255, 255, 255)),
     ("Yellow", (254, 219, 82))
-
+]
 
 for name, color in COLORS:
     print(f"Testing {name} color...")
@@ -58,3 +58,4 @@ except KeyboardInterrupt:
     # Clean exit
     display.set_backlight(0)  # Turn off backlight on exit
     print("\nExiting...")
+

@@ -1,3 +1,4 @@
+# Test script for checking colours and settings on the LCD Display.
 #!/usr/bin/env python3
 import logging
 import time
