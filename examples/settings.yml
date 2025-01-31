@@ -4,7 +4,7 @@ channel1:
   enabled: true
   pump_speed: 0.5
   pump_time: 0.5
-  warn_level: 0.2
+  warn_level: 10.8
   water_level: 0.15
   watering_delay: 60
   wet_point: 2.4
@@ -14,7 +14,7 @@ channel2:
   enabled: true
   pump_speed: 0.5
   pump_time: 0.5
-  warn_level: 0.5
+  warn_level: 12.0
   water_level: 0.4
   watering_delay: 60
   wet_point: 4.4
@@ -24,7 +24,7 @@ channel3:
   enabled: true
   pump_speed: 0.5
   pump_time: 0.5
-  warn_level: 0.4
+  warn_level: 9.9
   water_level: 0.3
   watering_delay: 60
   wet_point: 1.2

@@ -1001,28 +1001,24 @@ Dry point: {dry_point}
                         self._initialized = True
                 return  # Skip alarm checks during initialization
             
-            # Set alarm based on moisture level relative to dry_point and warn_level
+            # Set alarm based on fixed moisture level
             if self.enabled and moisture > 0:  # Only trigger alarm if channel is enabled and reading is valid
                 previous_alarm = self.alarm  # Store previous alarm state
                 
-                # Calculate the moisture range
-                moisture_range = self._wet_point - self._dry_point
-                # Calculate alarm threshold as percentage above dry_point
-                alarm_threshold = self._dry_point + (moisture_range * self.warn_level)
-                
-                should_alarm = moisture <= alarm_threshold
+                # Since lower numbers = wetter, alarm when moisture is HIGHER than warn_level
+                should_alarm = moisture >= self.warn_level
                 
                 # Debug logging
-                logging.info(f"Channel {self.channel} - Moisture: {moisture:.2f}, Alarm Threshold: {alarm_threshold:.2f} " +
-                            f"(Dry: {self._dry_point:.2f} + {self.warn_level*100}% of range {moisture_range:.2f})")
+                logging.info(f"Channel {self.channel} - Moisture: {moisture:.2f}, Alarm at: {self.warn_level:.2f} " +
+                            f"(Wet: {self._wet_point:.2f}, Dry: {self._dry_point:.2f})")
                 
                 self.alarm = should_alarm
                 
                 # Log alarm state changes
                 if self.alarm and not previous_alarm:
-                    logging.info(f"Channel {self.channel} alarm ACTIVATED - moisture ({moisture:.2f}) below threshold ({alarm_threshold:.2f})")
+                    logging.info(f"Channel {self.channel} alarm ACTIVATED - moisture ({moisture:.2f}) too dry (>{self.warn_level:.2f})")
                 elif not self.alarm and previous_alarm:
-                    logging.info(f"Channel {self.channel} alarm CLEARED - moisture ({moisture:.2f}) above threshold ({alarm_threshold:.2f})")
+                    logging.info(f"Channel {self.channel} alarm CLEARED - moisture ({moisture:.2f}) wet enough (<{self.warn_level:.2f})")
 
 
 class Alarm(View):
