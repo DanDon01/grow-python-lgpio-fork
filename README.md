@@ -1,13 +1,89 @@
-# Monitoring Your Plants
+# 🌱 Plant Monitoring System
 
-This is a fork of the original Grow project. The following changes have been made from the original:
+[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Flask](https://img.shields.io/badge/Flask-3.1.0-green.svg)](https://flask.palletsprojects.com/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Contributions Welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-- Integrated `lgpio` library for improved GPIO handling.
-- Improved user interface with additional controls and status indicators.
-- Bug fixes and performance improvements.
-- Using lgpio library 
+A Raspberry Pi-based plant monitoring and automation system using lgpio for GPIO control, with a web interface for real-time monitoring and control.
 
-## Kernel 5.4.51 SPI Chip-Select Issue
+## 🚀 Features
+
+- Real-time sensor data monitoring (moisture, temperature)
+- Automated pump control based on moisture levels
+- Web interface with live charts and controls
+- REST API for system control and data access
+- Alarm system for critical moisture levels
+- Built with lgpio for improved GPIO handling
+
+## 📋 Prerequisites
+
+- Raspberry Pi (tested on Pi 4)
+- Python 3.9 or higher
+- Virtual environment
+- lgpio library installed
+
+## 🛠️ Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/plant-monitoring-system.git
+cd plant-monitoring-system
+```
+2. Create and activate virtual environment:
+```bash
+python -m venv venv
+.\venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/Mac
+```
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+## 💻 Usage
+1. Start the Flask server:
+```bash
+python flask_app.py
+```
+2. Access the web interface:
+- Open http://localhost:5000 in your browser
+- View real-time sensor data
+- Control pumps manually
+- Set moisture thresholds
+
+## 🔧 Configuration
+Edit config.json to set:
+- Sensor pins
+- Pump channels
+- Moisture thresholds
+- Sampling intervals
+
+## 📊 API Endpoints
+
+- GET /sensor_data - Retrieve current sensor readings
+- POST /activate_pump/<channel_id> - Activate specific pump
+- GET /alarms - Get alarm history
+- POST /threshold/<channel_id> - Set moisture threshold
+
+## 🤝 Contributing
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📝 License
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🔍 Troubleshooting
+Known Issues
+SPI Chip-Select limitations with Kernel 5.4.51+
+See TROUBLESHOOTING.md for more details
+
+## 📞 Support
+Create an issue for bugs/features
+Check existing issues before creating new ones
+
+
+## 🔍 Troubleshooting
+## Kernel 5.4.51 SPI Chip-Select Issue Fix Has been used...
 
 As of the recent Kernel 5.4.51, it's no longer possible to add_event_detect on an SPI Chip-Select pin while the SPI interface is enabled.
 
