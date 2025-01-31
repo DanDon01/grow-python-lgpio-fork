@@ -644,12 +644,12 @@ class DetailView(ChannelView):
                 x = graph_x + graph_width - x - 1
                 self._draw.rectangle((x, graph_y + graph_height - h, x + 1, graph_y + graph_height), color)
 
-            # Draw alarm line - invert the calculation since lower numbers = wetter
+            # Draw alarm line - calculate based on the same scale as the color indicator
             moisture_range = self.channel._dry_point - self.channel._wet_point
             if moisture_range > 0:
-                # Invert the normalization since lower numbers = wetter
-                normalized_warn = (self.channel._dry_point - self.channel.warn_level) / moisture_range
-                alarm_line = int((1.0 - normalized_warn) * graph_height)  # Invert for display
+                # Invert the warn_level to match the display scale (like in indicator_color)
+                normalized_warn = 1.0 - (self.channel.warn_level / 100.0)
+                alarm_line = int(normalized_warn * graph_height)
 
                 r = 255
                 if self.channel.alarm:
@@ -663,13 +663,6 @@ class DetailView(ChannelView):
                         graph_x + graph_width,
                         graph_y + graph_height - alarm_line,
                     ),
-                    (r, 0, 0),
-                )
-
-                # Draw the alarm icon
-                self.icon(
-                    icon_alarm,
-                    (graph_x + graph_width + 5, graph_y + graph_height - alarm_line - 10),
                     (r, 0, 0),
                 )
 
