@@ -931,7 +931,7 @@ class Channel:
         b = a + 1
         blend = float(value - a)
 
-        r, g, b = [int(((self.colors[b][i] - self.colors[a][i]) * blend) + self.colors[a][i]) for i in range(3))]
+        r, g, b = [int(((self.colors[b][i] - self.colors[a][i]) * blend) + self.colors[a][i]) for i in range(3)]
 
         return (r, g, b)
 
