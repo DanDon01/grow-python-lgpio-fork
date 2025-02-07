@@ -8,11 +8,13 @@ CORS(app)  # Enable CORS if needed
 
 # Global variable to store channel references
 channels = None
+gpio_handle = None  # Add this
 
-def init_channels(channel_list):
-    """Initialize channels for the Flask app to access"""
-    global channels
+def init_channels(channel_list, handle):  # Modify to accept GPIO handle
+    """Initialize channels and GPIO handle for the Flask app to access"""
+    global channels, gpio_handle  # Add gpio_handle
     channels = channel_list
+    gpio_handle = handle  # Store the handle
 
 @app.route('/')
 def home():
@@ -55,16 +57,21 @@ def activate_pump(channel_id):
 def control_light(state):
     """Control USB grow light state"""
     try:
-        # Get GPIO handle from global scope
-        h = globals().get('h')
-        if not h:
+        # Use the global gpio_handle instead of looking in globals()
+        if not gpio_handle:
             return jsonify({'error': 'GPIO not initialized'}), 500
+            
+        # Set up GPIO 26 as output if not already
+        try:
+            GPIO.gpio_claim_output(gpio_handle, 26)
+        except:
+            pass  # Already claimed
             
         # Convert state string to boolean
         turn_on = state.lower() == 'on'
         
         # Write to GPIO
-        GPIO.gpio_write(h, 26, 1 if turn_on else 0)
+        GPIO.gpio_write(gpio_handle, 26, 1 if turn_on else 0)
         
         return jsonify({
             'success': True,
@@ -78,13 +85,11 @@ def control_light(state):
 def get_light_state():
     """Get current state of USB grow light"""
     try:
-        # Get GPIO handle from global scope
-        h = globals().get('h')
-        if not h:
+        if not gpio_handle:
             return jsonify({'error': 'GPIO not initialized'}), 500
             
         # Read current state
-        state = GPIO.gpio_read(h, 26)
+        state = GPIO.gpio_read(gpio_handle, 26)
         
         return jsonify({
             'state': 'on' if state == 1 else 'off'

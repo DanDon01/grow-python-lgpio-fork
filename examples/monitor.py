@@ -1592,6 +1592,10 @@ def main():
         h = GPIO.gpiochip_open(0)
         logging.info("GPIO handle opened successfully")
         
+        # Set up GPIO 26 as output for USB light
+        GPIO.gpio_claim_output(h, 26)
+        logging.info("USB light GPIO initialized")
+        
         # Set up button handlers
         for pin in BUTTONS:
             try:
@@ -1693,8 +1697,8 @@ def main():
 
         viewcontroller = ViewController(views)
 
-        # Initialize Flask app with channel access
-        init_channels(channels)
+        # Initialize Flask app with channel access and GPIO handle
+        init_channels(channels, h)  # Pass the GPIO handle
 
         # Main loop
         last_display_update = time.time()
