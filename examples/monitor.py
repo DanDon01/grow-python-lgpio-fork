@@ -1438,12 +1438,17 @@ def cleanup():
                 if channel.pump:
                     channel.pump.dose(0, 0.1)  # Ensure pumps are off
         
+        # Turn off USB power before cleanup
+        if 'h' in globals():
+            try:
+                GPIO.gpio_write(h, 26, 0)  # Turn off USB power
+                logging.info("USB power turned off during cleanup")
+            except Exception as e:
+                logging.error(f"Failed to turn off USB power: {e}")
+        
         # Close GPIO handle
-        try:
-            if 'h' in globals():
-                GPIO.gpiochip_close(h)
-        except Exception as e:
-            logging.error(f"GPIO cleanup error: {e}")
+        if 'h' in globals():
+            GPIO.gpiochip_close(h)
         
         logging.info("Cleanup complete")
         
@@ -1458,6 +1463,30 @@ def signal_handler(signum, frame):
     """Handle shutdown signals"""
     logging.info(f"Received signal {signum}, initiating shutdown...")
     cleanup()
+
+def test_usb_power(h):
+    """Test USB power switch functionality"""
+    try:
+        # Set up GPIO 26 as output
+        GPIO.gpio_claim_output(h, 26, GPIO.SET_ACTIVE_HIGH)
+        logging.info("Testing USB power switch...")
+        
+        # Turn USB power ON
+        GPIO.gpio_write(h, 26, 1)
+        logging.info("USB power ON")
+        time.sleep(3)  # Wait 3 seconds
+        
+        # Turn USB power OFF
+        GPIO.gpio_write(h, 26, 0)
+        logging.info("USB power OFF")
+        time.sleep(2)  # Wait 2 seconds
+        
+        # Turn back ON
+        GPIO.gpio_write(h, 26, 1)
+        logging.info("USB power back ON")
+        
+    except Exception as e:
+        logging.error(f"USB power switch test failed: {e}")
 
 def main():
     global viewcontroller, display, screensaver_thread, screensaver_stop_event
@@ -1591,9 +1620,12 @@ def main():
         image_blank = Image.new("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), color=(0, 0, 0))
         logging.info("Canvas prepared for drawing")
 
-        # Clean up GPIO and initialize
-        h = GPIO.gpiochip_open(0)  # Store the handle
+        # Initialize GPIO
+        h = GPIO.gpiochip_open(0)
         logging.info("GPIO handle opened successfully")
+        
+        # Test USB power switch
+        test_usb_power(h)
         
         # Set up button handlers
         for pin in BUTTONS:
