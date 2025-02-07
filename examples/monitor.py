@@ -1468,7 +1468,7 @@ def test_usb_power(h):
     """Test USB power switch functionality"""
     try:
         # Set up GPIO 26 as output
-        GPIO.gpio_claim_output(h, 26, GPIO.SET_ACTIVE_HIGH)
+        GPIO.gpio_claim_output(h, 26)  # Removed SET_ACTIVE_HIGH
         logging.info("Testing USB power switch...")
         
         # Turn USB power ON
@@ -1487,6 +1487,9 @@ def test_usb_power(h):
         
     except Exception as e:
         logging.error(f"USB power switch test failed: {e}")
+        # Log more details about the error
+        logging.error(f"Error type: {type(e)}")
+        logging.error(f"Error details: {str(e)}")
 
 def main():
     global viewcontroller, display, screensaver_thread, screensaver_stop_event
