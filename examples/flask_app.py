@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS  # If needed for cross-origin requests
 import json
+import lgpio as GPIO
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS if needed
@@ -47,6 +48,48 @@ def activate_pump(channel_id):
             'success': True,
             'message': f'Pump {channel_id} activated for {duration} seconds at speed {speed*100}%'
         })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/light/<state>', methods=['POST'])
+def control_light(state):
+    """Control USB grow light state"""
+    try:
+        # Get GPIO handle from global scope
+        h = globals().get('h')
+        if not h:
+            return jsonify({'error': 'GPIO not initialized'}), 500
+            
+        # Convert state string to boolean
+        turn_on = state.lower() == 'on'
+        
+        # Write to GPIO
+        GPIO.gpio_write(h, 26, 1 if turn_on else 0)
+        
+        return jsonify({
+            'success': True,
+            'state': 'on' if turn_on else 'off'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/light', methods=['GET'])
+def get_light_state():
+    """Get current state of USB grow light"""
+    try:
+        # Get GPIO handle from global scope
+        h = globals().get('h')
+        if not h:
+            return jsonify({'error': 'GPIO not initialized'}), 500
+            
+        # Read current state
+        state = GPIO.gpio_read(h, 26)
+        
+        return jsonify({
+            'state': 'on' if state == 1 else 'off'
+        })
+        
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
